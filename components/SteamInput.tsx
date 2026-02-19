@@ -84,11 +84,11 @@ export function SteamInput() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={t("landing.inputPlaceholder")}
-          className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+          className="flex-1 px-4 py-3 bg-gray-900/80 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
         />
         <button
           type="submit"
-          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all whitespace-nowrap"
+          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold rounded-xl hover:from-purple-500 hover:to-cyan-500 transition-all whitespace-nowrap shadow-lg shadow-purple-600/20"
         >
           {t("landing.submitButton")}
         </button>

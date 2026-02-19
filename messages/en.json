@@ -1,12 +1,12 @@
 {
   "meta": {
-    "title": "Steam Psycho — AI Personality Analysis from Your Steam Library",
+    "title": "GamerType — Discover Your Gaming Personality",
     "description": "Discover your gaming personality type based on your Steam library. Fun AI-powered analysis."
   },
   "landing": {
-    "title": "Steam Psycho",
-    "tagline": "AI Personality Analysis from Your Steam Library",
-    "subtitle": "Enter your Steam ID and find out what your games say about you",
+    "title": "GamerType",
+    "tagline": "What kind of gamer are you, really?",
+    "subtitle": "AI will analyze your Steam library and build your psychological portrait",
     "inputPlaceholder": "Steam ID, profile link, or vanity URL",
     "submitButton": "Analyze Me",
     "aiModel": "AI Model",

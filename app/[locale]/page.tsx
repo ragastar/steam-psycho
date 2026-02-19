@@ -6,24 +6,35 @@ export default function Home() {
   const t = useTranslations();
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {/* Background glow effects */}
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
+
+      <div className="absolute top-4 right-4 z-10">
         <LocaleSwitcher />
       </div>
 
-      <main className="w-full max-w-xl text-center space-y-8">
-        <div className="space-y-3">
-          <h1 className="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 bg-clip-text text-transparent">
-            {t("landing.title")}
+      <main className="w-full max-w-lg text-center space-y-10 relative z-10">
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium tracking-wide uppercase">
+            Steam AI Analysis
+          </div>
+
+          <h1 className="text-6xl sm:text-7xl font-extrabold tracking-tight">
+            <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 bg-clip-text text-transparent">
+              {t("landing.title")}
+            </span>
           </h1>
-          <p className="text-lg text-gray-400">
+
+          <p className="text-xl text-gray-300 font-medium">
             {t("landing.tagline")}
           </p>
-        </div>
 
-        <p className="text-gray-300">
-          {t("landing.subtitle")}
-        </p>
+          <p className="text-sm text-gray-500 max-w-md mx-auto">
+            {t("landing.subtitle")}
+          </p>
+        </div>
 
         <SteamInput />
 

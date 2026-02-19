@@ -9,7 +9,7 @@ import "../globals.css";
 const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Steam Psycho",
+  title: "GamerType — Discover Your Gaming Personality",
   description: "AI personality analysis from your Steam library",
 };
 

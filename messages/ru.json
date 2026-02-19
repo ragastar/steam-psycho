@@ -1,12 +1,12 @@
 {
   "meta": {
-    "title": "Steam Psycho — AI-психоанализ по библиотеке Steam",
+    "title": "GamerType — Узнай свой игровой психотип",
     "description": "Узнай свой игровой психотип по библиотеке Steam. Развлекательный AI-анализ."
   },
   "landing": {
-    "title": "Steam Psycho",
-    "tagline": "AI-психоанализ по библиотеке Steam",
-    "subtitle": "Введи свой Steam ID и узнай, что твои игры говорят о тебе",
+    "title": "GamerType",
+    "tagline": "Какой ты геймер на самом деле?",
+    "subtitle": "AI проанализирует твою библиотеку Steam и составит психологический портрет",
     "inputPlaceholder": "Steam ID, ссылка на профиль или vanity URL",
     "submitButton": "Узнать себя",
     "aiModel": "AI-модель",
