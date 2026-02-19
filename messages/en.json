@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "title": "Steam Psycho — AI Personality Analysis from Your Steam Library",
+    "description": "Discover your gaming personality type based on your Steam library. Fun AI-powered analysis."
+  },
+  "landing": {
+    "title": "Steam Psycho",
+    "tagline": "AI Personality Analysis from Your Steam Library",
+    "subtitle": "Enter your Steam ID and find out what your games say about you",
+    "inputPlaceholder": "Steam ID, profile link, or vanity URL",
+    "submitButton": "Analyze Me",
+    "aiModel": "AI Model",
+    "poweredBy": "Powered by {model}",
+    "disclaimer": "Entertainment content, not a real psychoanalysis"
+  },
+  "loading": {
+    "step1": "Finding profile...",
+    "step2": "Loading library...",
+    "step3": "Analyzing genres and tags...",
+    "step4": "Consulting the AI psychologist...",
+    "step5": "Rendering portrait..."
+  },
+  "result": {
+    "traits": "Traits",
+    "deepDive": "Deep Dive",
+    "spiritGame": "Spirit Game",
+    "funFacts": "Fun Facts",
+    "toxicTrait": "Toxic Trait",
+    "recommendation": "Recommendation",
+    "stats": "Stats",
+    "totalGames": "Total Games",
+    "totalHours": "Total Hours",
+    "concentration": "Concentration",
+    "topGenres": "Top Genres",
+    "checkFriend": "Check a Friend",
+    "because": "Because"
+  },
+  "share": {
+    "downloadPng": "Download PNG",
+    "copyLink": "Copy Link",
+    "shareTwitter": "Share on X",
+    "shareTelegram": "Share on Telegram",
+    "shareVk": "Share on VK",
+    "linkCopied": "Link copied!"
+  },
+  "errors": {
+    "invalidInput": "Please enter a valid Steam profile URL or SteamID",
+    "profileNotFound": "Profile not found. Check the URL and try again",
+    "privateProfile": "This profile is private. The user needs to make their game list public in Steam privacy settings",
+    "emptyLibrary": "Not enough data for analysis. Library is empty or has fewer than 3 games",
+    "steamUnavailable": "Steam servers are temporarily unavailable. Try again in a few minutes",
+    "analysisError": "Could not complete the analysis. Please try again",
+    "expired": "Analysis has expired. Click to re-analyze",
+    "rateLimited": "Too many requests. Please wait a moment and try again",
+    "retry": "Retry",
+    "howToOpen": "How to open profile"
+  },
+  "footer": {
+    "disclaimer": "Entertainment content. Not a medical or psychological assessment. Not affiliated with Valve Corporation."
+  }
+}
