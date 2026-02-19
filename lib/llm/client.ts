@@ -14,7 +14,7 @@ export interface LLMConfig {
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
   anthropic: "claude-sonnet-4-20250514",
-  openai: "gpt-4o-mini",
+  openai: "openai/gpt-4o-mini",
 };
 
 function getAvailableProvider(): LLMProvider {
@@ -97,7 +97,10 @@ async function generateWithOpenAI(
   locale: string,
   model: string,
 ): Promise<Portrait> {
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseURL: "https://openrouter.ai/api/v1",
+  });
 
   const response = await client.chat.completions.create({
     model,
