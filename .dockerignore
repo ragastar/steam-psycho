@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+.env.local
+.env*.local
+README.md
+Steam_Psycho_PRD_TZ.docx
+extract
+*.md
+.eslintrc.json
+.vscode
