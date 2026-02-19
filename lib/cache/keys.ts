@@ -6,6 +6,7 @@ export const CACHE_TTL = {
   portrait: 24 * 3600,          // 24 hours
   aggregatedProfile: 24 * 3600, // 24 hours
   rateLimit: 3600,              // 1 hour
+  gate: 3600,                   // 1 hour
 } as const;
 
 export function portraitKey(steamId64: string, locale: string): string {
@@ -18,4 +19,8 @@ export function profileKey(steamId64: string): string {
 
 export function rateLimitKey(ip: string): string {
   return `ratelimit:${ip}`;
+}
+
+export function gateTokenKey(token: string): string {
+  return `gate:${token}`;
 }

@@ -55,6 +55,12 @@
     "retry": "Retry",
     "howToOpen": "How to open profile"
   },
+  "gate": {
+    "title": "Unlock Your Full Portrait",
+    "description": "Subscribe to our Telegram channel to see your complete psychological portrait",
+    "button": "Subscribe & Unlock",
+    "hint": "Tap the button, subscribe to the channel, then press Start in the bot"
+  },
   "footer": {
     "disclaimer": "Entertainment content. Not a medical or psychological assessment. Not affiliated with Valve Corporation."
   }
