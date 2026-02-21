@@ -11,28 +11,28 @@ interface GateData {
 const WELCOME = `🎮 GamerType — AI-психоанализ по библиотеке Steam.
 
 Что делаю:
-→ Подтверждаю подписку на @gamertype
+→ Подтверждаю подписку на @gamertyper
 → Разблокирую твою карточку
 
 Как получить карточку:
 1. Заходи на gamertype.fun
 2. Вставь ссылку на Steam-профиль
-3. Подпишись на @gamertype
+3. Подпишись на @gamertyper
 4. Получи результат!
 
-Канал: @gamertype
+Канал: @gamertyper
 Сайт: gamertype.fun`;
 
 const MESSAGES = {
   ru: {
     unlocked: "✅ Портрет открыт! Вернись на сайт — он уже обновился.",
-    notSubscribed: "Сначала подпишись на канал @gamertype, а потом нажми /start снова.",
+    notSubscribed: "Сначала подпишись на канал @gamertyper, а потом нажми /start снова.",
     expired: "Ссылка устарела. Открой портрет на сайте заново.",
     error: "Что-то пошло не так. Попробуй ещё раз.",
   },
   en: {
     unlocked: "✅ Portrait unlocked! Go back to the site — it's already updated.",
-    notSubscribed: "Subscribe to @gamertype first, then press /start again.",
+    notSubscribed: "Subscribe to @gamertyper first, then press /start again.",
     expired: "This link has expired. Open your portrait on the site again.",
     error: "Something went wrong. Please try again.",
   },
@@ -67,7 +67,7 @@ export function registerHandlers() {
       return;
     }
 
-    const channelId = process.env.TELEGRAM_CHANNEL_ID || "@gamertype";
+    const channelId = process.env.TELEGRAM_CHANNEL_ID || "@gamertyperr";
     try {
       const member = await ctx.api.getChatMember(channelId, ctx.from!.id);
       const isSubscribed = ["member", "administrator", "creator"].includes(member.status);
