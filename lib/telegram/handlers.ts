@@ -67,7 +67,7 @@ export function registerHandlers() {
       return;
     }
 
-    const channelId = process.env.TELEGRAM_CHANNEL_ID || "@gamertyper";
+    const channelId = process.env.TELEGRAM_CHANNEL_ID || "@gamertype";
     try {
       const member = await ctx.api.getChatMember(channelId, ctx.from!.id);
       const isSubscribed = ["member", "administrator", "creator"].includes(member.status);
