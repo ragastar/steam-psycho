@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCache } from "@/lib/cache/redis";
 import { portraitKey, profileKey } from "@/lib/cache/keys";
 import { renderCardPng } from "@/lib/card/render";
-import type { Portrait } from "@/lib/llm/types";
+import type { CardPortrait } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
   const locale = url.searchParams.get("locale") || "ru";
 
   const [portrait, profile] = await Promise.all([
-    getCache<Portrait>(portraitKey(params.id, locale)),
+    getCache<CardPortrait>(portraitKey(params.id, locale)),
     getCache<AggregatedProfile>(profileKey(params.id)),
   ]);
 
@@ -26,7 +26,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(png), {
       headers: {
         "Content-Type": "image/png",
-        "Content-Disposition": `attachment; filename="steam-psycho-${params.id}.png"`,
+        "Content-Disposition": `attachment; filename="gamertype-${params.id}.png"`,
         "Cache-Control": "public, max-age=86400",
       },
     });

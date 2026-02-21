@@ -6,7 +6,7 @@
   "landing": {
     "title": "GamerType",
     "tagline": "What kind of gamer are you, really?",
-    "subtitle": "AI will analyze your Steam library and build your psychological portrait",
+    "subtitle": "AI will analyze your Steam library and create your collectible card",
     "inputPlaceholder": "Steam ID, profile link, or vanity URL",
     "submitButton": "Analyze Me",
     "aiModel": "AI Model",
@@ -17,47 +17,196 @@
     "step1": "Finding profile...",
     "step2": "Loading library...",
     "step3": "Analyzing genres and tags...",
-    "step4": "Consulting the AI psychologist...",
-    "step5": "Rendering portrait..."
+    "step4": "Creating your collectible card...",
+    "step5": "Final touches..."
+  },
+  "tabs": {
+    "card": "Card",
+    "deepDive": "Deep Dive",
+    "artGen": "AI Art"
+  },
+  "stats": {
+    "dedication": "Dedication",
+    "mastery": "Mastery",
+    "exploration": "Exploration",
+    "hoarding": "Hoarding",
+    "social": "Social",
+    "veteran": "Veteran"
+  },
+  "archetypes": {
+    "primary": "primary",
+    "secondary": "secondary",
+    "shadow": "shadow"
   },
   "result": {
-    "traits": "Traits",
-    "deepDive": "Deep Dive",
+    "vibeQuote": "Quote",
     "spiritGame": "Spirit Game",
-    "funFacts": "Fun Facts",
-    "toxicTrait": "Toxic Trait",
-    "recommendation": "Recommendation",
-    "stats": "Stats",
+    "spiritAnimal": "Spirit Animal",
     "totalGames": "Total Games",
     "totalHours": "Total Hours",
-    "concentration": "Concentration",
-    "topGenres": "Top Genres",
-    "checkFriend": "Check a Friend",
-    "because": "Because"
+    "steamLevel": "Steam Level",
+    "topGames": "Top Games",
+    "genreDistribution": "Genres",
+    "challengeFriend": "Challenge a Friend",
+    "rarity": {
+      "common": "Common",
+      "uncommon": "Uncommon",
+      "rare": "Rare",
+      "epic": "Epic",
+      "legendary": "Legendary"
+    }
+  },
+  "deepDive": {
+    "economics": {
+      "title": "Library Economics",
+      "libraryValue": "Library Value",
+      "wasted": "Wasted (Unplayed)",
+      "perHour": "Cost per Hour",
+      "bestDeal": "Best Deal",
+      "freeGames": "Free Games"
+    },
+    "achievements": {
+      "title": "Achievements",
+      "completion": "Completion",
+      "rarest": "Rarest",
+      "noData": "No achievement data available"
+    },
+    "platforms": {
+      "title": "Platforms"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "accountAge": "Account Age",
+      "currentMonthly": "Monthly Hours",
+      "trend": "Trend",
+      "lastActive": "Last Active",
+      "years": "yrs",
+      "hours": "h",
+      "trendRising": "Rising",
+      "trendStable": "Stable",
+      "trendDeclining": "Declining",
+      "trendInactive": "Inactive"
+    },
+    "social": {
+      "title": "Social Graph",
+      "friends": "Friends",
+      "perYear": "Friends/Year",
+      "oldestFriend": "Oldest Friend",
+      "noData": "Friends list is private"
+    },
+    "patterns": {
+      "title": "Behavioral Patterns",
+      "genreConcentration": "Genre Focus",
+      "bingeStyle": "Play Style",
+      "indieGames": "Indie Games",
+      "binger": "Binger",
+      "sampler": "Sampler",
+      "balanced": "Balanced"
+    },
+    "ranks": {
+      "title": "Percentiles",
+      "hours": "Hours",
+      "library": "Library",
+      "concentration": "Concentration",
+      "veteran": "Veteran"
+    },
+    "badges": {
+      "title": "Steam Badges",
+      "total": "Total Badges",
+      "xp": "Experience",
+      "rarest": "Rarest",
+      "noData": "No badge data available"
+    }
+  },
+  "artGen": {
+    "pipeline": {
+      "title": "Generation Pipeline",
+      "step1": "Steam Data",
+      "step2": "LLM Analysis",
+      "step3": "Image Prompt",
+      "step4": "DALL-E 3"
+    },
+    "mapping": {
+      "title": "Data → Art Mapping",
+      "element": "Element",
+      "creature": "Creature",
+      "mood": "Mood",
+      "scene": "Scene"
+    },
+    "prompt": {
+      "title": "Image Prompt",
+      "copy": "Copy",
+      "copied": "Copied!"
+    },
+    "schema": {
+      "title": "LLM Output (JSON)",
+      "expand": "Expand",
+      "collapse": "Collapse"
+    }
   },
   "share": {
     "downloadPng": "Download PNG",
     "copyLink": "Copy Link",
-    "shareTwitter": "Share on X",
-    "shareTelegram": "Share on Telegram",
-    "shareVk": "Share on VK",
-    "linkCopied": "Link copied!"
+    "shareTwitter": "X",
+    "shareTelegram": "Telegram",
+    "shareVk": "VK",
+    "linkCopied": "Link copied!",
+    "shareTextRu": "Зацени мой геймерский профиль! {emoji} {archetype} [{rarity}]",
+    "shareTextEn": "Check out my gamer profile! {emoji} {archetype} [{rarity}]"
   },
   "errors": {
-    "invalidInput": "Please enter a valid Steam profile URL or SteamID",
-    "profileNotFound": "Profile not found. Check the URL and try again",
-    "privateProfile": "This profile is private. The user needs to make their game list public in Steam privacy settings",
-    "emptyLibrary": "Not enough data for analysis. Library is empty or has fewer than 3 games",
-    "steamUnavailable": "Steam servers are temporarily unavailable. Try again in a few minutes",
-    "analysisError": "Could not complete the analysis. Please try again",
+    "invalidInput": {
+      "title": "Invalid format",
+      "description": "Could not recognize the Steam profile. Please check your input.",
+      "steps": ["Open your Steam profile", "Copy the URL from the address bar", "Paste the full link here"],
+      "action": "Try again"
+    },
+    "profileNotFound": {
+      "title": "Profile not found",
+      "description": "Could not find a Steam profile with this link.",
+      "steps": ["Check the URL or SteamID is correct", "Make sure the profile exists"],
+      "action": "Try again"
+    },
+    "privateProfile": {
+      "title": "Private profile",
+      "description": "This Steam profile is private. Game data needs to be public.",
+      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Wait a couple minutes and try again"],
+      "action": "Try again"
+    },
+    "hiddenLibrary": {
+      "title": "Library hidden",
+      "description": "Profile is public but the game library is hidden in privacy settings.",
+      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Wait a couple minutes and try again"],
+      "action": "Try again"
+    },
+    "fewGames": {
+      "title": "Too few games",
+      "description": "You need at least 5 games in your library for analysis. Not enough data yet."
+    },
+    "emptyLibrary": {
+      "title": "Empty library",
+      "description": "No games found in the library or data is unavailable."
+    },
+    "steamUnavailable": {
+      "title": "Steam unavailable",
+      "description": "Steam servers are temporarily not responding. Usually resolves in a few minutes.",
+      "action": "Try again"
+    },
+    "analysisError": {
+      "title": "Analysis error",
+      "description": "Something went wrong while creating your card. Please try again.",
+      "action": "Try again"
+    },
     "expired": "Analysis has expired. Click to re-analyze",
-    "rateLimited": "Too many requests. Please wait a moment and try again",
-    "retry": "Retry",
-    "howToOpen": "How to open profile"
+    "rateLimited": {
+      "title": "Too many requests",
+      "description": "Please wait a moment and try again."
+    },
+    "retry": "Retry"
   },
   "gate": {
-    "title": "Unlock Your Full Portrait",
-    "description": "Subscribe to our Telegram channel to see your complete psychological portrait",
+    "title": "Unlock Your Full Card",
+    "description": "Subscribe to our Telegram channel to see your complete card",
     "button": "Subscribe & Unlock",
     "hint": "Tap the button, subscribe to the channel, then press Start in the bot"
   },

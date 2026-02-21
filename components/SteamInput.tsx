@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { LoadingAnimation } from "./LoadingAnimation";
+import { ErrorDisplay } from "./ErrorDisplay";
 
 interface Provider {
   id: string;
@@ -17,7 +18,7 @@ export function SteamInput() {
   const locale = useLocale();
   const router = useRouter();
   const [input, setInput] = useState("");
-  const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
@@ -35,15 +36,15 @@ export function SteamInput() {
       .catch(() => {});
   }, [selectedProvider]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
-      setError(t("errors.invalidInput"));
+      setErrorCode("INVALID_INPUT");
       return;
     }
 
-    setError("");
+    setErrorCode("");
     setLoading(true);
 
     try {
@@ -60,17 +61,22 @@ export function SteamInput() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || t("errors.analysisError"));
+        setErrorCode(data.code || "ANALYSIS_ERROR");
         setLoading(false);
         return;
       }
 
       router.push(`/${locale}/result/${data.steamId64}`);
     } catch {
-      setError(t("errors.analysisError"));
+      setErrorCode("ANALYSIS_ERROR");
       setLoading(false);
     }
-  };
+  }, [input, locale, selectedProvider, router]);
+
+  const handleRetry = useCallback(() => {
+    setErrorCode("");
+    handleSubmit();
+  }, [handleSubmit]);
 
   if (loading) {
     return <LoadingAnimation />;
@@ -122,8 +128,8 @@ export function SteamInput() {
         </p>
       )}
 
-      {error && (
-        <p className="text-red-400 text-sm text-left">{error}</p>
+      {errorCode && (
+        <ErrorDisplay code={errorCode} onRetry={handleRetry} />
       )}
     </form>
   );

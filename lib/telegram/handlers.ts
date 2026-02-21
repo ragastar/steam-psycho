@@ -8,16 +8,31 @@ interface GateData {
   status: "pending" | "unlocked";
 }
 
+const WELCOME = `🎮 GamerType — AI-психоанализ по библиотеке Steam.
+
+Что делаю:
+→ Подтверждаю подписку на @gamertype
+→ Разблокирую твою карточку
+
+Как получить карточку:
+1. Заходи на gamertype.fun
+2. Вставь ссылку на Steam-профиль
+3. Подпишись на @gamertype
+4. Получи результат!
+
+Канал: @gamertype
+Сайт: gamertype.fun`;
+
 const MESSAGES = {
   ru: {
-    unlocked: "Портрет открыт! Вернись на сайт — он уже обновился.",
-    notSubscribed: "Сначала подпишись на канал, а потом нажми /start снова:\nhttps://t.me/gamertyper",
+    unlocked: "✅ Портрет открыт! Вернись на сайт — он уже обновился.",
+    notSubscribed: "Сначала подпишись на канал @gamertype, а потом нажми /start снова.",
     expired: "Ссылка устарела. Открой портрет на сайте заново.",
     error: "Что-то пошло не так. Попробуй ещё раз.",
   },
   en: {
-    unlocked: "Portrait unlocked! Go back to the site — it's already updated.",
-    notSubscribed: "Subscribe to the channel first, then press /start again:\nhttps://t.me/gamertyper",
+    unlocked: "✅ Portrait unlocked! Go back to the site — it's already updated.",
+    notSubscribed: "Subscribe to @gamertype first, then press /start again.",
     expired: "This link has expired. Open your portrait on the site again.",
     error: "Something went wrong. Please try again.",
   },
@@ -33,7 +48,10 @@ export function registerHandlers() {
 
   bot.command("start", async (ctx) => {
     const token = ctx.match?.trim();
-    if (!token) return;
+    if (!token) {
+      await ctx.reply(WELCOME);
+      return;
+    }
 
     const data = await getCache<GateData>(gateTokenKey(token));
     const locale = data?.locale === "en" ? "en" : "ru";

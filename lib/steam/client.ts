@@ -1,4 +1,4 @@
-import type { SteamPlayer, OwnedGame } from "./types";
+import type { SteamPlayer, OwnedGame, PlayerAchievement, GlobalAchievement, SteamFriend, BadgesResponse } from "./types";
 import { SteamApiError } from "./types";
 import { parseInput } from "./resolve";
 
@@ -96,4 +96,64 @@ export async function getSteamLevel(steamId64: string): Promise<number> {
   const data = await steamFetch<{ response: { player_level?: number } }>(url);
 
   return data.response.player_level || 0;
+}
+
+export async function getPlayerAchievements(
+  steamId64: string,
+  appId: number,
+): Promise<PlayerAchievement[]> {
+  try {
+    const key = getApiKey();
+    const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?key=${key}&steamid=${steamId64}&appid=${appId}`;
+    const data = await steamFetch<{
+      playerstats: { success: boolean; achievements?: PlayerAchievement[] };
+    }>(url);
+    return data.playerstats.achievements || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getGlobalAchievementPercentages(
+  appId: number,
+): Promise<GlobalAchievement[]> {
+  try {
+    const url = `${STEAM_API_BASE}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${appId}`;
+    const data = await steamFetch<{
+      achievementpercentages: { achievements?: GlobalAchievement[] };
+    }>(url);
+    return data.achievementpercentages.achievements || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getFriendList(steamId64: string): Promise<SteamFriend[]> {
+  try {
+    const key = getApiKey();
+    const url = `${STEAM_API_BASE}/ISteamUser/GetFriendList/v1/?key=${key}&steamid=${steamId64}&relationship=friend`;
+    const data = await steamFetch<{
+      friendslist?: { friends?: SteamFriend[] };
+    }>(url);
+    return data.friendslist?.friends || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getBadges(steamId64: string): Promise<BadgesResponse | null> {
+  try {
+    const key = getApiKey();
+    const url = `${STEAM_API_BASE}/IPlayerService/GetBadges/v1/?key=${key}&steamid=${steamId64}`;
+    const data = await steamFetch<{
+      response: { badges?: BadgesResponse["badges"]; player_xp?: number; player_level?: number };
+    }>(url);
+    return {
+      badges: data.response.badges || [],
+      player_xp: data.response.player_xp || 0,
+      player_level: data.response.player_level || 0,
+    };
+  } catch {
+    return null;
+  }
 }

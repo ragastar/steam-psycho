@@ -35,6 +35,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# generated art
+/data/art/
+/public/art/*.png
+
 # PRD docs
 /extract/
 *.docx

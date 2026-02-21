@@ -6,6 +6,8 @@ export interface SteamPlayer {
   communityvisibilitystate: number; // 3 = public
   personastate: number;
   lastlogoff?: number;
+  timecreated?: number;
+  loccountrycode?: string;
   gameextrainfo?: string; // currently playing
   gameid?: string;
 }
@@ -24,6 +26,47 @@ export interface OwnedGame {
 export interface EnrichedGame extends OwnedGame {
   tags: Record<string, number>; // tag name -> weight
   genres: string[];
+  price?: number;
+  isFree?: boolean;
+  averageForever?: number; // global average playtime (minutes)
+}
+
+export interface PlayerAchievement {
+  apiname: string;
+  achieved: number; // 0 or 1
+  unlocktime: number;
+}
+
+export interface GlobalAchievement {
+  name: string;
+  percent: number;
+}
+
+export interface SteamFriend {
+  steamid: string;
+  relationship: string;
+  friend_since: number;
+}
+
+export interface Badge {
+  badgeid: number;
+  level: number;
+  completion_time: number;
+  xp: number;
+  scarcity: number;
+}
+
+export interface BadgesResponse {
+  badges: Badge[];
+  player_xp: number;
+  player_level: number;
+}
+
+export interface AchievementGameData {
+  appid: number;
+  name: string;
+  achievements: PlayerAchievement[];
+  globalAchievements: GlobalAchievement[];
 }
 
 export interface SteamSpyAppData {

@@ -24,19 +24,43 @@ async function fetchSteamSpyTags(appId: number): Promise<Record<string, number>>
   });
 }
 
-async function fetchStoreGenres(appId: number): Promise<string[]> {
-  return cached(`steam:genres:${appId}`, 7 * 24 * 3600, async () => {
+async function fetchSteamSpyAppData(appId: number): Promise<SteamSpyAppData | null> {
+  return cached(`steam:spy:${appId}`, 7 * 24 * 3600, async () => {
+    try {
+      const res = await fetch(`${STEAMSPY_BASE}?request=appdetails&appid=${appId}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  });
+}
+
+interface StoreEnrichResult {
+  genres: string[];
+  price: number | undefined;
+  isFree: boolean;
+}
+
+async function fetchStoreData(appId: number): Promise<StoreEnrichResult> {
+  return cached(`steam:store:${appId}`, 7 * 24 * 3600, async () => {
     try {
       const res = await fetch(`${STORE_BASE}/appdetails?appids=${appId}&l=english`, {
         signal: AbortSignal.timeout(5000),
       });
-      if (!res.ok) return [];
+      if (!res.ok) return { genres: [], price: undefined, isFree: false };
       const data = await res.json();
       const appData = data[String(appId)];
-      if (!appData?.success || !appData.data?.genres) return [];
-      return appData.data.genres.map((g: { description: string }) => g.description);
+      if (!appData?.success) return { genres: [], price: undefined, isFree: false };
+      const genres = appData.data?.genres?.map((g: { description: string }) => g.description) || [];
+      const isFree = appData.data?.is_free === true;
+      const priceData = appData.data?.price_overview;
+      const price = priceData ? priceData.final / 100 : undefined;
+      return { genres, price, isFree };
     } catch {
-      return [];
+      return { genres: [], price: undefined, isFree: false };
     }
   });
 }
@@ -52,15 +76,19 @@ export async function enrichGames(
   const enriched: EnrichedGame[] = [];
 
   for (const game of topGames) {
-    const [tags, genres] = await Promise.all([
+    const [tags, storeData, spyData] = await Promise.all([
       fetchSteamSpyTags(game.appid),
-      fetchStoreGenres(game.appid),
+      fetchStoreData(game.appid),
+      fetchSteamSpyAppData(game.appid),
     ]);
 
     enriched.push({
       ...game,
       tags,
-      genres,
+      genres: storeData.genres,
+      price: storeData.price,
+      isFree: storeData.isFree,
+      averageForever: spyData?.average_forever,
     });
 
     await delay(DELAY_MS);
@@ -71,6 +99,9 @@ export async function enrichGames(
     ...game,
     tags: {},
     genres: [],
+    price: undefined,
+    isFree: false,
+    averageForever: undefined,
   }));
 
   return [...enriched, ...remainingGames];

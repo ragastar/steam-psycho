@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import type { AggregatedProfile } from "../aggregation/types";
-import type { Portrait } from "./types";
-import { PortraitSchema } from "./types";
+import type { CardPortrait, Rarity } from "./types";
+import type { CardStats } from "../aggregation/aggregate";
+import { CardPortraitSchema } from "./types";
 import { getSystemPrompt, buildUserPrompt } from "./prompt";
 
 export type LLMProvider = "anthropic" | "openai";
@@ -31,7 +32,7 @@ function resolveConfig(provider?: LLMProvider): LLMConfig {
   };
 }
 
-// --- Извлечение JSON ---
+// --- JSON extraction ---
 
 function extractJSON(text: string): unknown {
   try {
@@ -49,16 +50,18 @@ function extractJSON(text: string): unknown {
 
 async function generateWithAnthropic(
   profile: AggregatedProfile,
+  cardStats: CardStats,
+  rarity: Rarity,
   locale: string,
   model: string,
-): Promise<Portrait> {
+): Promise<CardPortrait> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const response = await client.messages.create({
     model,
-    max_tokens: 2000,
+    max_tokens: 4000,
     system: getSystemPrompt(locale),
-    messages: [{ role: "user", content: buildUserPrompt(profile) }],
+    messages: [{ role: "user", content: buildUserPrompt(profile, cardStats, rarity) }],
   });
 
   const textBlock = response.content.find((b) => b.type === "text");
@@ -67,16 +70,16 @@ async function generateWithAnthropic(
   }
 
   const json = extractJSON(textBlock.text);
-  const parsed = PortraitSchema.safeParse(json);
+  const parsed = CardPortraitSchema.safeParse(json);
   if (parsed.success) return parsed.data;
 
   // Retry
   const retry = await client.messages.create({
     model,
-    max_tokens: 2000,
+    max_tokens: 4000,
     system: getSystemPrompt(locale),
     messages: [
-      { role: "user", content: buildUserPrompt(profile) },
+      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
       { role: "assistant", content: textBlock.text },
       {
         role: "user",
@@ -87,16 +90,18 @@ async function generateWithAnthropic(
 
   const retryText = retry.content.find((b) => b.type === "text");
   if (!retryText || retryText.type !== "text") throw new Error("No text in retry");
-  return PortraitSchema.parse(extractJSON(retryText.text));
+  return CardPortraitSchema.parse(extractJSON(retryText.text));
 }
 
 // --- OpenAI ---
 
 async function generateWithOpenAI(
   profile: AggregatedProfile,
+  cardStats: CardStats,
+  rarity: Rarity,
   locale: string,
   model: string,
-): Promise<Portrait> {
+): Promise<CardPortrait> {
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: "https://openrouter.ai/api/v1",
@@ -104,10 +109,10 @@ async function generateWithOpenAI(
 
   const response = await client.chat.completions.create({
     model,
-    max_tokens: 2000,
+    max_tokens: 4000,
     messages: [
       { role: "system", content: getSystemPrompt(locale) },
-      { role: "user", content: buildUserPrompt(profile) },
+      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
     ],
   });
 
@@ -115,16 +120,16 @@ async function generateWithOpenAI(
   if (!text) throw new Error("No text in OpenAI response");
 
   const json = extractJSON(text);
-  const parsed = PortraitSchema.safeParse(json);
+  const parsed = CardPortraitSchema.safeParse(json);
   if (parsed.success) return parsed.data;
 
   // Retry
   const retry = await client.chat.completions.create({
     model,
-    max_tokens: 2000,
+    max_tokens: 4000,
     messages: [
       { role: "system", content: getSystemPrompt(locale) },
-      { role: "user", content: buildUserPrompt(profile) },
+      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
       { role: "assistant", content: text },
       {
         role: "user",
@@ -135,23 +140,25 @@ async function generateWithOpenAI(
 
   const retryText = retry.choices[0]?.message?.content;
   if (!retryText) throw new Error("No text in retry");
-  return PortraitSchema.parse(extractJSON(retryText));
+  return CardPortraitSchema.parse(extractJSON(retryText));
 }
 
 // --- Public API ---
 
 export async function generatePortrait(
   profile: AggregatedProfile,
+  cardStats: CardStats,
+  rarity: Rarity,
   locale: string,
   provider?: LLMProvider,
-): Promise<Portrait> {
+): Promise<CardPortrait> {
   const config = resolveConfig(provider);
 
   switch (config.provider) {
     case "anthropic":
-      return generateWithAnthropic(profile, locale, config.model!);
+      return generateWithAnthropic(profile, cardStats, rarity, locale, config.model!);
     case "openai":
-      return generateWithOpenAI(profile, locale, config.model!);
+      return generateWithOpenAI(profile, cardStats, rarity, locale, config.model!);
     default:
       throw new Error(`Unknown LLM provider: ${config.provider}`);
   }

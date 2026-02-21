@@ -1,43 +1,63 @@
-export interface CardTheme {
-  bgGradient: string[];
+import type { Rarity } from "../llm/types";
+
+export interface RarityTheme {
+  borderColor: string;
+  gradient: [string, string];
+  glowShadow: string;
   accentColor: string;
-  textColor: string;
+  badgeBg: string;
+  badgeText: string;
+  barColor: string;
 }
 
-const THEMES: Record<string, CardTheme> = {
-  strategist: {
-    bgGradient: ["#1a1a2e", "#16213e"],
-    accentColor: "#e2b714",
-    textColor: "#ffffff",
+const RARITY_THEMES: Record<Rarity, RarityTheme> = {
+  common: {
+    borderColor: "#6b7280",
+    gradient: ["#1f2937", "#111827"],
+    glowShadow: "0 0 20px rgba(107, 114, 128, 0.3)",
+    accentColor: "#9ca3af",
+    badgeBg: "#374151",
+    badgeText: "#d1d5db",
+    barColor: "#6b7280",
   },
-  explorer: {
-    bgGradient: ["#1a2e1a", "#162e21"],
-    accentColor: "#4ecca3",
-    textColor: "#ffffff",
+  uncommon: {
+    borderColor: "#22c55e",
+    gradient: ["#052e16", "#0a1f0d"],
+    glowShadow: "0 0 20px rgba(34, 197, 94, 0.3)",
+    accentColor: "#4ade80",
+    badgeBg: "#14532d",
+    badgeText: "#86efac",
+    barColor: "#22c55e",
   },
-  warrior: {
-    bgGradient: ["#2e1a1a", "#3e1616"],
-    accentColor: "#e74c3c",
-    textColor: "#ffffff",
+  rare: {
+    borderColor: "#3b82f6",
+    gradient: ["#0c1f3f", "#0a1628"],
+    glowShadow: "0 0 20px rgba(59, 130, 246, 0.3)",
+    accentColor: "#60a5fa",
+    badgeBg: "#1e3a5f",
+    badgeText: "#93c5fd",
+    barColor: "#3b82f6",
   },
-  collector: {
-    bgGradient: ["#1a1a2e", "#2e1a3e"],
-    accentColor: "#9b59b6",
-    textColor: "#ffffff",
+  epic: {
+    borderColor: "#a855f7",
+    gradient: ["#2e1065", "#1a0533"],
+    glowShadow: "0 0 20px rgba(168, 85, 247, 0.3)",
+    accentColor: "#c084fc",
+    badgeBg: "#3b0764",
+    badgeText: "#d8b4fe",
+    barColor: "#a855f7",
   },
-  default: {
-    bgGradient: ["#0f0f1a", "#1a0f2e"],
-    accentColor: "#a855f7",
-    textColor: "#ffffff",
+  legendary: {
+    borderColor: "#f59e0b",
+    gradient: ["#451a03", "#2a1000"],
+    glowShadow: "0 0 30px rgba(245, 158, 11, 0.4)",
+    accentColor: "#fbbf24",
+    badgeBg: "#713f12",
+    badgeText: "#fde68a",
+    barColor: "#f59e0b",
   },
 };
 
-export function getTheme(archetype: string): CardTheme {
-  const lower = archetype.toLowerCase();
-  for (const [key, theme] of Object.entries(THEMES)) {
-    if (key !== "default" && lower.includes(key)) {
-      return theme;
-    }
-  }
-  return THEMES.default;
+export function getRarityTheme(rarity: Rarity): RarityTheme {
+  return RARITY_THEMES[rarity];
 }

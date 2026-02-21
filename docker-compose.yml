@@ -5,3 +5,10 @@ services:
     env_file: .env.local
     ports:
       - "3001:3000"
+    volumes:
+      - art-data:/data/art
+    environment:
+      - ART_STORAGE_PATH=/data/art
+
+volumes:
+  art-data:

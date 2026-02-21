@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server";
-import { resolveToSteamId64, getPlayerSummary, getOwnedGames, getRecentlyPlayedGames, getSteamLevel } from "@/lib/steam/client";
+import {
+  resolveToSteamId64,
+  getPlayerSummary,
+  getOwnedGames,
+  getRecentlyPlayedGames,
+  getSteamLevel,
+  getFriendList,
+  getBadges,
+  getPlayerAchievements,
+  getGlobalAchievementPercentages,
+} from "@/lib/steam/client";
 import { enrichGames } from "@/lib/steam/enrich";
-import { buildAggregatedProfile } from "@/lib/aggregation/aggregate";
+import { buildAggregatedProfile, calculateCardStats, calculateRarity } from "@/lib/aggregation/aggregate";
 import { generatePortrait, type LLMProvider } from "@/lib/llm/client";
 import { SteamApiError } from "@/lib/steam/types";
+import type { AchievementGameData } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { CACHE_TTL, portraitKey, profileKey, rateLimitKey } from "@/lib/cache/keys";
 
@@ -12,9 +23,41 @@ const ERROR_CODES: Record<string, number> = {
   PROFILE_NOT_FOUND: 404,
   PRIVATE_PROFILE: 403,
   EMPTY_LIBRARY: 400,
+  HIDDEN_LIBRARY: 403,
+  FEW_GAMES: 400,
   STEAM_UNAVAILABLE: 502,
   RATE_LIMITED: 429,
 };
+
+async function fetchAchievementsForTopGames(
+  steamId64: string,
+  games: { appid: number; name: string }[],
+): Promise<AchievementGameData[]> {
+  const results: AchievementGameData[] = [];
+  // Fetch for top 10 games, graceful failure
+  const topGames = games.slice(0, 10);
+
+  for (const game of topGames) {
+    try {
+      const [achievements, globalAchievements] = await Promise.all([
+        getPlayerAchievements(steamId64, game.appid),
+        getGlobalAchievementPercentages(game.appid),
+      ]);
+      if (achievements.length > 0) {
+        results.push({
+          appid: game.appid,
+          name: game.name,
+          achievements,
+          globalAchievements,
+        });
+      }
+    } catch {
+      // Graceful: skip this game
+    }
+  }
+
+  return results;
+}
 
 export async function POST(req: Request) {
   try {
@@ -53,24 +96,61 @@ export async function POST(req: Request) {
       return NextResponse.json({ steamId64, cached: true });
     }
 
-    // 3. Fetch player data
-    const [player, games, recentGames, level] = await Promise.all([
+    // 3. Fetch player data (parallel)
+    const [player, games, recentGames, level, friends, badgesResponse] = await Promise.all([
       getPlayerSummary(steamId64),
       getOwnedGames(steamId64),
       getRecentlyPlayedGames(steamId64),
       getSteamLevel(steamId64),
+      getFriendList(steamId64),
+      getBadges(steamId64),
     ]);
 
-    // 4. Enrich with tags
+    // 3.5 Check for hidden library
+    if (!games || games.length === 0) {
+      return NextResponse.json(
+        { error: true, code: "HIDDEN_LIBRARY", message: "Game library is hidden" },
+        { status: 403 },
+      );
+    }
+
+    // 3.6 Check for too few games
+    if (games.length < 5) {
+      return NextResponse.json(
+        { error: true, code: "FEW_GAMES", message: "Not enough games for analysis (minimum 5)" },
+        { status: 400 },
+      );
+    }
+
+    // 4. Enrich with tags + prices
     const enrichedGames = await enrichGames(games);
 
-    // 5. Aggregate profile
-    const profile = buildAggregatedProfile(player, enrichedGames, recentGames, level);
+    // 5. Fetch achievements for top games
+    const sortedGames = [...enrichedGames].sort((a, b) => b.playtime_forever - a.playtime_forever);
+    const achievementsData = await fetchAchievementsForTopGames(
+      steamId64,
+      sortedGames.slice(0, 10).map((g) => ({ appid: g.appid, name: g.name })),
+    );
 
-    // 6. Generate portrait via LLM
-    const portrait = await generatePortrait(profile, locale, provider);
+    // 6. Aggregate profile
+    const profile = buildAggregatedProfile(
+      player,
+      enrichedGames,
+      recentGames,
+      level,
+      friends,
+      badgesResponse,
+      achievementsData,
+    );
 
-    // 7. Cache results
+    // 7. Calculate card stats and rarity
+    const cardStats = calculateCardStats(profile);
+    const rarity = calculateRarity(profile);
+
+    // 8. Generate portrait via LLM
+    const portrait = await generatePortrait(profile, cardStats, rarity, locale, provider);
+
+    // 9. Cache results
     await Promise.all([
       setCache(portraitKey(steamId64, locale), portrait, CACHE_TTL.portrait),
       setCache(profileKey(steamId64), profile, CACHE_TTL.aggregatedProfile),
