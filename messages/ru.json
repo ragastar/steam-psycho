@@ -23,6 +23,7 @@
   "tabs": {
     "card": "Карточка",
     "deepDive": "Полный разбор",
+    "psychoProfile": "Психопрофиль",
     "artGen": "AI-арт"
   },
   "stats": {
@@ -56,6 +57,7 @@
     "topGames": "Топ игры",
     "genreDistribution": "Жанры",
     "challengeFriend": "Бросить вызов другу",
+    "inDevelopment": "в разработке",
     "rarity": {
       "common": "Common",
       "uncommon": "Uncommon",
@@ -126,6 +128,45 @@
       "rarest": "Редчайший",
       "noData": "Нет данных по бейджам"
     }
+  },
+  "psychoProfile": {
+    "summary": "Заключение психолога",
+    "bigFive": "Большая пятёрка",
+    "bigFiveDesc": "Психологический профиль на основе игровых предпочтений",
+    "openness": "Открытость",
+    "conscientiousness": "Добросовестность",
+    "extraversion": "Экстраверсия",
+    "agreeableness": "Дружелюбие",
+    "neuroticism": "Нейротизм",
+    "motivations": "Мотивации",
+    "motivationsDesc": "Что движет тобой в играх",
+    "motAchievement": "Достижения",
+    "motImmersion": "Погружение",
+    "motSocial": "Общение",
+    "motMastery": "Мастерство",
+    "motEscapism": "Эскапизм",
+    "motCuriosity": "Любопытство",
+    "traits": "Черты личности",
+    "decisionStyle": "Стиль решений",
+    "socialType": "Социальный тип",
+    "fictionalMatch": "Игровой двойник",
+    "fictionalFrom": "из",
+    "fictionalWhy": "Почему",
+    "decisionStyles": {
+      "methodical": "Методичный",
+      "impulsive": "Импульсивный",
+      "completionist": "Комплитионист",
+      "optimizer": "Оптимизатор",
+      "explorer": "Исследователь"
+    },
+    "socialTypes": {
+      "lone_wolf": "Одинокий волк",
+      "pack_leader": "Вожак стаи",
+      "silent_ally": "Молчаливый союзник",
+      "social_butterfly": "Душа компании",
+      "ghost": "Призрак"
+    },
+    "newBadge": "NEW"
   },
   "artGen": {
     "pipeline": {

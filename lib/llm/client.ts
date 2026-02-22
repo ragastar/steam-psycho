@@ -59,7 +59,7 @@ async function generateWithAnthropic(
 
   const response = await client.messages.create({
     model,
-    max_tokens: 4000,
+    max_tokens: 5000,
     system: getSystemPrompt(locale),
     messages: [{ role: "user", content: buildUserPrompt(profile, cardStats, rarity) }],
   });
@@ -76,7 +76,7 @@ async function generateWithAnthropic(
   // Retry
   const retry = await client.messages.create({
     model,
-    max_tokens: 4000,
+    max_tokens: 5000,
     system: getSystemPrompt(locale),
     messages: [
       { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
@@ -109,7 +109,7 @@ async function generateWithOpenAI(
 
   const response = await client.chat.completions.create({
     model,
-    max_tokens: 4000,
+    max_tokens: 5000,
     messages: [
       { role: "system", content: getSystemPrompt(locale) },
       { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
@@ -128,7 +128,7 @@ async function generateWithOpenAI(
   // Retry
   const retry = await client.chat.completions.create({
     model,
-    max_tokens: 4000,
+    max_tokens: 5000,
     messages: [
       { role: "system", content: getSystemPrompt(locale) },
       { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },

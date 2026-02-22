@@ -23,6 +23,7 @@
   "tabs": {
     "card": "Card",
     "deepDive": "Deep Dive",
+    "psychoProfile": "Psycho Profile",
     "artGen": "AI Art"
   },
   "stats": {
@@ -56,6 +57,7 @@
     "topGames": "Top Games",
     "genreDistribution": "Genres",
     "challengeFriend": "Challenge a Friend",
+    "inDevelopment": "coming soon",
     "rarity": {
       "common": "Common",
       "uncommon": "Uncommon",
@@ -126,6 +128,45 @@
       "rarest": "Rarest",
       "noData": "No badge data available"
     }
+  },
+  "psychoProfile": {
+    "summary": "Psychologist's Verdict",
+    "bigFive": "Big Five",
+    "bigFiveDesc": "Psychological profile based on gaming preferences",
+    "openness": "Openness",
+    "conscientiousness": "Conscientiousness",
+    "extraversion": "Extraversion",
+    "agreeableness": "Agreeableness",
+    "neuroticism": "Neuroticism",
+    "motivations": "Motivations",
+    "motivationsDesc": "What drives you in games",
+    "motAchievement": "Achievement",
+    "motImmersion": "Immersion",
+    "motSocial": "Social",
+    "motMastery": "Mastery",
+    "motEscapism": "Escapism",
+    "motCuriosity": "Curiosity",
+    "traits": "Personality Traits",
+    "decisionStyle": "Decision Style",
+    "socialType": "Social Type",
+    "fictionalMatch": "Gaming Twin",
+    "fictionalFrom": "from",
+    "fictionalWhy": "Why",
+    "decisionStyles": {
+      "methodical": "Methodical",
+      "impulsive": "Impulsive",
+      "completionist": "Completionist",
+      "optimizer": "Optimizer",
+      "explorer": "Explorer"
+    },
+    "socialTypes": {
+      "lone_wolf": "Lone Wolf",
+      "pack_leader": "Pack Leader",
+      "silent_ally": "Silent Ally",
+      "social_butterfly": "Social Butterfly",
+      "ghost": "Ghost"
+    },
+    "newBadge": "NEW"
   },
   "artGen": {
     "pipeline": {

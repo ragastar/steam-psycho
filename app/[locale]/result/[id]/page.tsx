@@ -86,12 +86,11 @@ export default async function ResultPage({ params }: Props) {
         />
 
         <div className="text-center">
-          <a
-            href={`/${params.locale}`}
-            className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:opacity-90 transition-all shadow-lg"
+          <span
+            className="inline-block px-8 py-3 bg-gray-700 text-gray-400 font-semibold rounded-xl cursor-not-allowed"
           >
-            {t("result.challengeFriend")}
-          </a>
+            {t("result.challengeFriend")} — {t("result.inDevelopment")}
+          </span>
         </div>
 
         <p className="text-center text-xs text-gray-700">{t("footer.disclaimer")}</p>

@@ -17,6 +17,13 @@ import { PatternsGrid } from "./DeepDive/PatternsGrid";
 import { RanksCard } from "./DeepDive/RanksCard";
 import { BadgesCard } from "./DeepDive/BadgesCard";
 import { TelegramGate } from "./TelegramGate";
+import { PsychSummaryCard } from "./PsychoProfile/PsychSummaryCard";
+import { BigFiveChart } from "./PsychoProfile/BigFiveChart";
+import { MotivationBars } from "./PsychoProfile/MotivationBars";
+import { TraitsList } from "./PsychoProfile/TraitsList";
+import { DecisionStyleCard } from "./PsychoProfile/DecisionStyleCard";
+import { SocialTypeCard } from "./PsychoProfile/SocialTypeCard";
+import { FictionalMatchCard } from "./PsychoProfile/FictionalMatchCard";
 import type { CardPortrait, Rarity } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 
@@ -78,8 +85,13 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
   const barClass = RARITY_BAR[rarity];
   const badgeClass = RARITY_BADGE_BG[rarity];
 
+  const hasPsychoProfile = !!portrait.psycho_profile;
+
   const tabs = [
     { id: "card", label: t("tabs.card"), icon: "🃏" },
+    ...(hasPsychoProfile
+      ? [{ id: "psycho", label: t("tabs.psychoProfile"), icon: "🧠", isNew: true }]
+      : []),
     { id: "deepdive", label: t("tabs.deepDive"), icon: "🔍" },
   ];
 
@@ -239,6 +251,67 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === "psycho" && portrait.psycho_profile && (
+            <div className="space-y-4">
+              <PsychSummaryCard
+                summary={portrait.psycho_profile.psych_summary}
+                label={t("psychoProfile.summary")}
+              />
+              <BigFiveChart
+                bigFive={portrait.psycho_profile.big_five}
+                labels={portrait.psycho_profile.big_five_labels}
+                i18n={{
+                  title: t("psychoProfile.bigFive"),
+                  description: t("psychoProfile.bigFiveDesc"),
+                  openness: t("psychoProfile.openness"),
+                  conscientiousness: t("psychoProfile.conscientiousness"),
+                  extraversion: t("psychoProfile.extraversion"),
+                  agreeableness: t("psychoProfile.agreeableness"),
+                  neuroticism: t("psychoProfile.neuroticism"),
+                }}
+              />
+              <MotivationBars
+                motivations={portrait.psycho_profile.motivations}
+                i18n={{
+                  title: t("psychoProfile.motivations"),
+                  description: t("psychoProfile.motivationsDesc"),
+                  achievement: t("psychoProfile.motAchievement"),
+                  immersion: t("psychoProfile.motImmersion"),
+                  social: t("psychoProfile.motSocial"),
+                  mastery: t("psychoProfile.motMastery"),
+                  escapism: t("psychoProfile.motEscapism"),
+                  curiosity: t("psychoProfile.motCuriosity"),
+                }}
+              />
+              <TraitsList
+                traits={portrait.psycho_profile.traits}
+                label={t("psychoProfile.traits")}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DecisionStyleCard
+                  style={portrait.psycho_profile.decision_style}
+                  description={portrait.psycho_profile.decision_style_description}
+                  label={t("psychoProfile.decisionStyle")}
+                  styleLabel={t(`psychoProfile.decisionStyles.${portrait.psycho_profile.decision_style}`)}
+                />
+                <SocialTypeCard
+                  type={portrait.psycho_profile.social_type}
+                  description={portrait.psycho_profile.social_type_description}
+                  label={t("psychoProfile.socialType")}
+                  typeLabel={t(`psychoProfile.socialTypes.${portrait.psycho_profile.social_type}`)}
+                />
+              </div>
+              <FictionalMatchCard
+                character={portrait.psycho_profile.fictional_character}
+                i18n={{
+                  title: t("psychoProfile.fictionalMatch"),
+                  from: t("psychoProfile.fictionalFrom"),
+                  why: t("psychoProfile.fictionalWhy"),
+                }}
+              />
             </div>
           )}
 

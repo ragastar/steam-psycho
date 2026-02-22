@@ -44,8 +44,19 @@ export default function Home() {
         </p>
       </main>
 
-      <footer className="absolute bottom-4 text-center text-xs text-gray-700 px-4">
-        {t("footer.disclaimer")}
+      <footer className="absolute bottom-4 text-center text-xs text-gray-700 px-4 space-y-2">
+        <p>
+          <a
+            href="https://t.me/theragastar"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 text-purple-400 hover:text-purple-300 hover:border-purple-400/40 transition-all text-xs font-medium"
+          >
+            разработано по приколу
+            <span className="font-semibold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">@theragastar</span>
+          </a>
+        </p>
+        <p>{t("footer.disclaimer")}</p>
       </footer>
     </div>
   );

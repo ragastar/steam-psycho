@@ -11,7 +11,7 @@ export const CACHE_TTL = {
 } as const;
 
 export function portraitKey(steamId64: string, locale: string): string {
-  return `portrait:v3:${steamId64}:${locale}`;
+  return `portrait:v4:${steamId64}:${locale}`;
 }
 
 export function profileKey(steamId64: string): string {
