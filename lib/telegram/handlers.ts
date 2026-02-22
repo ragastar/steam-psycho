@@ -67,7 +67,7 @@ export function registerHandlers() {
       return;
     }
 
-    const channelId = process.env.TELEGRAM_CHANNEL_ID || "@gamertyperr";
+    const channelId = process.env.TELEGRAM_CHANNEL_ID || "@gamertyper";
     try {
       const member = await ctx.api.getChatMember(channelId, ctx.from!.id);
       const isSubscribed = ["member", "administrator", "creator"].includes(member.status);
@@ -78,7 +78,8 @@ export function registerHandlers() {
       } else {
         await ctx.reply(msg.notSubscribed);
       }
-    } catch {
+    } catch (err) {
+      console.error("[gate] Subscription check failed:", channelId, err);
       await ctx.reply(msg.error);
     }
   });
