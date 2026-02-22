@@ -119,12 +119,11 @@ async function generateWithOpenAI(
   const text = response.choices[0]?.message?.content;
   if (!text) throw new Error("No text in OpenAI response");
 
-  const json = extractJSON(text) as Record<string, unknown>;
-  console.log(`[llm] OpenAI raw creature: "${json?.creature}", element: "${json?.element}"`);
+  const json = extractJSON(text);
   const parsed = CardPortraitSchema.safeParse(json);
   if (parsed.success) return parsed.data;
 
-  console.warn(`[llm] OpenAI parse failed:`, parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`));
+  console.warn(`[llm] OpenAI parse failed:`, (parsed as { error: { issues: { path: string[]; message: string }[] } }).error.issues.map((e) => `${e.path.join(".")}: ${e.message}`));
 
   // Retry
   const retry = await client.chat.completions.create({

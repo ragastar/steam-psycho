@@ -136,7 +136,11 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
     <div className="relative">
       <div
         className="transition-[filter] duration-700 ease-out"
-        style={{ filter: unlocked ? "none" : "blur(8px)" }}
+        style={{
+          filter: unlocked ? "none" : "blur(12px)",
+          maxHeight: unlocked ? "none" : "280px",
+          overflow: unlocked ? "visible" : "hidden",
+        }}
       >
         {children}
       </div>
@@ -147,11 +151,11 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
-            className="absolute inset-0 flex items-center justify-center z-10"
+            className="absolute inset-x-0 top-0 bottom-0 flex items-start justify-center z-10 pt-8 bg-gradient-to-b from-transparent via-gray-950/80 to-gray-950"
           >
-            <div className="bg-gray-900/95 backdrop-blur-sm rounded-2xl p-8 max-w-sm mx-4 text-center space-y-4 border border-purple-500/30 shadow-lg shadow-purple-500/10">
-              <div className="text-4xl">🔒</div>
-              <h3 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+            <div className="bg-gray-900/95 backdrop-blur-sm rounded-2xl p-6 max-w-sm mx-4 text-center space-y-3 border border-purple-500/30 shadow-lg shadow-purple-500/10">
+              <div className="text-3xl">🔒</div>
+              <h3 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
                 {t("title")}
               </h3>
               <p className="text-gray-400 text-sm">{t("description")}</p>
@@ -159,7 +163,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
                 href={botUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-500 hover:to-pink-500 transition-all"
+                className="inline-block w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-500 hover:to-pink-500 transition-all shadow-lg shadow-purple-500/20"
               >
                 {t("button")}
               </a>

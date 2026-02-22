@@ -4,6 +4,12 @@ import { portraitKey } from "@/lib/cache/keys";
 import type { CardPortrait } from "@/lib/llm/types";
 import { buildImagePrompt } from "@/lib/art/prompt-builder";
 import { generateArtImage } from "@/lib/art/image-client";
+import type { Creature, Element } from "@/lib/art/card-identity";
+
+interface CardIdentity {
+  creature: Creature;
+  element: Element;
+}
 
 export async function POST(req: Request) {
   try {
@@ -18,7 +24,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Portrait not found" }, { status: 404 });
     }
 
-    const imagePrompt = buildImagePrompt(portrait);
+    // Get algorithmically selected creature + element
+    const identity = await getCache<CardIdentity>(`art:identity:${steamId64}`);
+    const creature: Creature = identity?.creature || "phoenix";
+    const element: Element = identity?.element || "arcane";
+
+    const imagePrompt = buildImagePrompt(portrait, creature, element);
     const result = await generateArtImage(steamId64, imagePrompt);
 
     return NextResponse.json(result);

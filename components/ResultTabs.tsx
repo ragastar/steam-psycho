@@ -251,8 +251,6 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                     title: t("deepDive.economics.title"),
                     libraryValue: t("deepDive.economics.libraryValue"),
                     wasted: t("deepDive.economics.wasted"),
-                    perHour: t("deepDive.economics.perHour"),
-                    bestDeal: t("deepDive.economics.bestDeal"),
                     freeGames: t("deepDive.economics.freeGames"),
                     disclaimer: t("deepDive.economics.disclaimer"),
                   }}

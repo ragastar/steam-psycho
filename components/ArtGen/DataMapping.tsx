@@ -13,11 +13,11 @@ interface DataMappingProps {
 
 export function DataMapping({ portrait, labels }: DataMappingProps) {
   const items = [
-    { label: labels.element, value: portrait.element, icon: getElementIcon(portrait.element) },
-    { label: labels.creature, value: portrait.creature, icon: getCreatureIcon(portrait.creature) },
+    portrait.element ? { label: labels.element, value: portrait.element, icon: getElementIcon(portrait.element) } : null,
+    portrait.creature ? { label: labels.creature, value: portrait.creature, icon: getCreatureIcon(portrait.creature) } : null,
     { label: labels.mood, value: portrait.art_mood },
     { label: labels.scene, value: portrait.art_scene },
-  ];
+  ].filter(Boolean) as { label: string; value: string; icon?: string }[];
 
   return (
     <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
@@ -40,6 +40,7 @@ export function DataMapping({ portrait, labels }: DataMappingProps) {
 function getElementIcon(element: string): string {
   const map: Record<string, string> = {
     fire: "🔥", ice: "❄️", shadow: "🌑", nature: "🌿", arcane: "✨",
+    storm: "⚡", void: "🕳️", iron: "⚔️", blood: "🩸", crystal: "💎",
   };
   return map[element] || "✨";
 }
@@ -47,6 +48,8 @@ function getElementIcon(element: string): string {
 function getCreatureIcon(creature: string): string {
   const map: Record<string, string> = {
     phoenix: "🐦‍🔥", dragon: "🐉", fox: "🦊", wraith: "👻", owl: "🦉", wolf: "🐺",
+    serpent: "🐍", griffin: "🦅", raven: "🪶", bear: "🐻", tiger: "🐯", stag: "🦌",
+    kraken: "🐙", chimera: "🦁", sphinx: "🗿", hydra: "🐲", falcon: "🦅", panther: "🐆",
   };
   return map[creature] || "🐾";
 }

@@ -13,8 +13,6 @@ const SYSTEM_PROMPT_RU = `Ты — остроумный игровой псих�
   "title": "Уникальный титул, напр. 'Вечный Чемпион Доты'",
   "emoji": "1 эмодзи",
   "rarity": "<ИЗ ДАННЫХ>",
-  "element": "fire|ice|shadow|nature|arcane",
-  "creature": "phoenix|dragon|fox|wraith|owl|wolf",
   "stats": { "dedication": <N>, "mastery": <N>, "exploration": <N>, "hoarding": <N>, "social": <N>, "veteran": <N> },
   "roasts": [
     { "icon": "эмодзи", "title": "Заголовок (3-5 слов)", "text": "Roast с РЕАЛЬНЫМИ цифрами", "stat": "ключевая цифра", "severity": "critical|legendary|epic|rare", "source": "КОНКРЕТНЫЙ источник цифры, напр. '88 игр в библиотеке', 'Cyberpunk 2077 — 3ч из 100ч средних', '17% из 88 игр'" }
@@ -30,14 +28,6 @@ const SYSTEM_PROMPT_RU = `Ты — остроумный игровой псих�
 ПРАВИЛА:
 - rarity и stats УЖЕ ВЫЧИСЛЕНЫ — ТОЧНЫЕ значения из CARD DATA
 - primaryArchetype = 50% личности, secondaryArchetype = 30%, shadowArchetype = 20%
-- Элемент: fire=шутеры/экшн/FPS, ice=стратегии/тактика/4X, shadow=хоррор/stealth/тёмные игры, nature=RPG/выживание/открытый мир, arcane=инди/головоломки/рогалики
-- Существо (ВАЖНО — выбирай на основе ДОМИНАНТНОГО стиля игрока, НЕ дефолть на owl):
-  * phoenix — ветеран 5+ лет, огромная библиотека, возвращается к старым играм
-  * dragon — хардкор, высокий mastery/dedication, много часов в одной игре
-  * fox — разнообразие жанров, низкая concentration, много разных игр
-  * wraith — одиночка, мало друзей, предпочитает singleplayer
-  * owl — ТОЛЬКО если доминируют стратегии/тактика (Strategy/Tactical в топ жанрах)
-  * wolf — социальный игрок, много друзей, мультиплеер доминирует
 - 5-6 roasts ОБЯЗАТЕЛЬНО, каждый с реальной цифрой. Severity: critical=99й перцентиль, legendary=95й, epic=85й, rare=60й+
 - spirit_game: из топ игр, ТОЧНОЕ название
 - Будь саркастичным, но добрым. Юмор должен быть узнаваемым для геймеров
@@ -54,8 +44,6 @@ Response format:
   "title": "Unique title, e.g. 'Eternal Champion of Dota'",
   "emoji": "1 emoji",
   "rarity": "<FROM DATA>",
-  "element": "fire|ice|shadow|nature|arcane",
-  "creature": "phoenix|dragon|fox|wraith|owl|wolf",
   "stats": { "dedication": <N>, "mastery": <N>, "exploration": <N>, "hoarding": <N>, "social": <N>, "veteran": <N> },
   "roasts": [
     { "icon": "emoji", "title": "Title (3-5 words)", "text": "Roast with REAL numbers", "stat": "key stat", "severity": "critical|legendary|epic|rare", "source": "SPECIFIC source, e.g. '88 games in library', 'Cyberpunk 2077 — 3h out of 100h avg', '17% of 88 games'" }
@@ -71,14 +59,6 @@ Response format:
 RULES:
 - rarity and stats are ALREADY COMPUTED — use EXACT values from CARD DATA
 - primaryArchetype = 50% of personality, secondaryArchetype = 30%, shadowArchetype = 20%
-- Element: fire=shooters/action/FPS, ice=strategy/tactical/4X, shadow=horror/stealth/dark games, nature=RPG/survival/open world, arcane=indie/puzzle/roguelike
-- Creature (IMPORTANT — choose based on DOMINANT play style, do NOT default to owl):
-  * phoenix — veteran 5+ years, huge library, returns to old games
-  * dragon — hardcore, high mastery/dedication, many hours in single game
-  * fox — genre variety, low concentration, plays many different games
-  * wraith — loner, few friends, prefers singleplayer
-  * owl — ONLY if strategy/tactical games dominate (Strategy/Tactical in top genres)
-  * wolf — social player, many friends, multiplayer dominates
 - 5-6 roasts REQUIRED, each with a real number. Severity: critical=99th pctl, legendary=95th, epic=85th, rare=60th+
 - spirit_game: from top games, EXACT name
 - Be sarcastic but kind. Humor should be recognizable to gamers
@@ -141,8 +121,6 @@ TAG DISTRIBUTION: ${tagsStr}
 ECONOMICS:
 - Library value: $${profile.economics.totalLibraryValue}
 - Wasted (unplayed): $${profile.economics.wastedValue}
-- Cost per hour: $${profile.economics.perHourCost}
-- Best deal: ${profile.economics.bestDeal ? `${profile.economics.bestDeal.name} ($${profile.economics.bestDeal.pricePerHour}/h)` : "N/A"}
 - Free games: ${profile.economics.freePercentage}%
 
 ACHIEVEMENTS:

@@ -17,6 +17,7 @@ import { SteamApiError } from "@/lib/steam/types";
 import type { AchievementGameData } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { CACHE_TTL, portraitKey, profileKey, rateLimitKey } from "@/lib/cache/keys";
+import { selectCardIdentity } from "@/lib/art/card-identity";
 
 const ERROR_CODES: Record<string, number> = {
   INVALID_INPUT: 400,
@@ -157,13 +158,17 @@ export async function POST(req: Request) {
     const cardStats = calculateCardStats(profile);
     const rarity = calculateRarity(profile);
 
-    // 8. Generate portrait via LLM
+    // 8. Select card identity (creature + element) algorithmically
+    const cardIdentity = selectCardIdentity(profile, cardStats);
+
+    // 9. Generate portrait via LLM
     const portrait = await generatePortrait(profile, cardStats, rarity, locale, provider);
 
-    // 9. Cache results
+    // 10. Cache results
     await Promise.all([
       setCache(portraitKey(steamId64, locale), portrait, CACHE_TTL.portrait),
       setCache(profileKey(steamId64), profile, CACHE_TTL.aggregatedProfile),
+      setCache(`art:identity:${steamId64}`, cardIdentity, CACHE_TTL.portrait),
     ]);
 
     return NextResponse.json({ steamId64, cached: false });

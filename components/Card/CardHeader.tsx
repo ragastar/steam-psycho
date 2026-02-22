@@ -57,15 +57,15 @@ export function CardHeader({ portrait, profile, rarityGradient, rarityBorder, st
 
   return (
     <div className="relative">
-      {/* Art Zone (5:3 aspect ratio) */}
-      <div className="relative w-full" style={{ paddingBottom: "60%" }}>
+      {/* Art Zone */}
+      <div className="relative w-full" style={{ paddingBottom: "75%" }}>
         {artUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={artUrl}
               alt={portrait.primaryArchetype.name}
-              className="absolute inset-0 w-full h-full object-cover rounded-t-2xl"
+              className="absolute inset-0 w-full h-full object-contain rounded-t-2xl bg-gray-950"
             />
             {/* Download button */}
             <button

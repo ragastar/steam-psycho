@@ -3,6 +3,8 @@ import { z } from "zod";
 export const RarityEnum = z.enum(["common", "uncommon", "rare", "epic", "legendary"]);
 export type Rarity = z.infer<typeof RarityEnum>;
 
+// Element and Creature are now selected algorithmically in lib/art/card-identity.ts
+// Kept for backwards compatibility with cached portraits
 export const ElementEnum = z.enum(["fire", "ice", "shadow", "nature", "arcane"]);
 export type Element = z.infer<typeof ElementEnum>;
 
@@ -50,8 +52,8 @@ export const CardPortraitSchema = z.object({
   title: z.string(),
   emoji: z.string(),
   rarity: RarityEnum,
-  element: ElementEnum,
-  creature: CreatureEnum,
+  element: ElementEnum.optional(),
+  creature: CreatureEnum.optional(),
   stats: CardStatsSchema,
   roasts: z.array(RoastSchema).min(5).max(6),
   spirit_game: z.string(),
