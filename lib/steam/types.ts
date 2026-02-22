@@ -77,6 +77,8 @@ export interface SteamSpyAppData {
   owners: string;
   average_forever: number;
   tags: Record<string, number>;
+  price?: string; // price in cents, e.g. "2699"
+  initialprice?: string; // original price in cents, e.g. "5999"
 }
 
 export interface StoreAppDetails {

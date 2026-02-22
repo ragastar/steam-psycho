@@ -15,6 +15,7 @@ const ERROR_CODE_MAP: Record<string, string> = {
   HIDDEN_LIBRARY: "hiddenLibrary",
   FEW_GAMES: "fewGames",
   EMPTY_LIBRARY: "emptyLibrary",
+  NO_PLAYTIME: "noPlaytime",
   STEAM_UNAVAILABLE: "steamUnavailable",
   ANALYSIS_ERROR: "analysisError",
   RATE_LIMITED: "rateLimited",
@@ -54,7 +55,8 @@ export function ErrorDisplay({ code, onRetry }: ErrorDisplayProps) {
 
   let action: string | null = null;
   try {
-    action = t(`${key}.action`);
+    const actionRaw = t.raw(`${key}.action`);
+    if (typeof actionRaw === "string") action = actionRaw;
   } catch {
     // no action for this error
   }

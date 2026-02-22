@@ -19,6 +19,7 @@ export default function Home() {
         <div className="space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-medium tracking-wide uppercase">
             Steam AI Analysis
+            <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono">beta v0.1</span>
           </div>
 
           <h1 className="text-6xl sm:text-7xl font-extrabold tracking-tight">

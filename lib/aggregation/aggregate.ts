@@ -28,18 +28,23 @@ function calculateEconomics(games: EnrichedGame[]): AggregatedProfile["economics
   let freeCount = 0;
   let bestDeal: { name: string; pricePerHour: number } | null = null;
 
+  const MIN_HOURS_FOR_PPH = 2; // Minimum 2 hours to calculate $/h
+
   for (const game of games) {
     if (game.isFree) {
       freeCount++;
       continue;
     }
-    const price = game.price || 0;
+    if (game.price === undefined) continue;
+    const price = game.price;
     totalValue += price;
     if (game.playtime_forever === 0) {
       wastedValue += price;
     }
-    if (price > 0 && game.playtime_forever > 0) {
-      const pph = price / (game.playtime_forever / 60);
+    // Only calculate $/h for games with 2+ hours — avoids absurd numbers
+    const hours = game.playtime_forever / 60;
+    if (price > 0 && hours >= MIN_HOURS_FOR_PPH) {
+      const pph = price / hours;
       if (!bestDeal || pph < bestDeal.pricePerHour) {
         bestDeal = { name: game.name, pricePerHour: Math.round(pph * 100) / 100 };
       }

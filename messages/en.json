@@ -31,7 +31,15 @@
     "exploration": "Exploration",
     "hoarding": "Hoarding",
     "social": "Social",
-    "veteran": "Veteran"
+    "veteran": "Veteran",
+    "explain": {
+      "dedication": "Total playtime + % of games actually played",
+      "mastery": "Focus on top games + achievements + average hours per game",
+      "exploration": "Library size + genre diversity + spread across games",
+      "hoarding": "% of unplayed games + library size",
+      "social": "Friend count + multiplayer game ratio",
+      "veteran": "Account age + Steam level + badge count"
+    }
   },
   "archetypes": {
     "primary": "primary",
@@ -63,7 +71,8 @@
       "wasted": "Wasted (Unplayed)",
       "perHour": "Cost per Hour",
       "bestDeal": "Best Deal",
-      "freeGames": "Free Games"
+      "freeGames": "Free Games",
+      "disclaimer": "Prices are approximate, based on current Steam prices. This section is being improved."
     },
     "achievements": {
       "title": "Achievements",
@@ -181,11 +190,20 @@
     },
     "fewGames": {
       "title": "Too few games",
-      "description": "You need at least 5 games in your library for analysis. Not enough data yet."
+      "description": "You need at least 5 games in your library for analysis. Not enough data yet.",
+      "action": "Try again"
     },
     "emptyLibrary": {
       "title": "Empty library",
-      "description": "No games found in the library or data is unavailable."
+      "description": "No games found in the library or data is unavailable. The library may be hidden in Steam privacy settings.",
+      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Wait a couple minutes and try again"],
+      "action": "Try again"
+    },
+    "noPlaytime": {
+      "title": "Playtime data hidden",
+      "description": "Games are in the library, but playtime data is unavailable. Most likely, game stats are hidden in Steam privacy settings.",
+      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Make sure 'Playtime' is also set to Public", "Wait a couple minutes and try again"],
+      "action": "Try again"
     },
     "steamUnavailable": {
       "title": "Steam unavailable",
@@ -200,7 +218,8 @@
     "expired": "Analysis has expired. Click to re-analyze",
     "rateLimited": {
       "title": "Too many requests",
-      "description": "Please wait a moment and try again."
+      "description": "Please wait a moment and try again.",
+      "action": "Try again"
     },
     "retry": "Retry"
   },

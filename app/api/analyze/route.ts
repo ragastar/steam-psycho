@@ -25,6 +25,7 @@ const ERROR_CODES: Record<string, number> = {
   EMPTY_LIBRARY: 400,
   HIDDEN_LIBRARY: 403,
   FEW_GAMES: 400,
+  NO_PLAYTIME: 403,
   STEAM_UNAVAILABLE: 502,
   RATE_LIMITED: 429,
 };
@@ -119,6 +120,15 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: true, code: "FEW_GAMES", message: "Not enough games for analysis (minimum 5)" },
         { status: 400 },
+      );
+    }
+
+    // 3.7 Check for all games having zero playtime (partial privacy)
+    const gamesWithPlaytime = games.filter((g) => g.playtime_forever > 0);
+    if (gamesWithPlaytime.length === 0) {
+      return NextResponse.json(
+        { error: true, code: "NO_PLAYTIME", message: "All games have zero playtime — likely privacy settings" },
+        { status: 403 },
       );
     }
 

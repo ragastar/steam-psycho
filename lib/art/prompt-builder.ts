@@ -27,8 +27,15 @@ const RARITY_QUALITY: Record<string, string> = {
 
 export function buildImagePrompt(portrait: CardPortrait): string {
   const element = ELEMENT_STYLES[portrait.element] || ELEMENT_STYLES.arcane;
-  const creature = CREATURE_DESCRIPTIONS[portrait.creature] || CREATURE_DESCRIPTIONS.owl;
+  const creature = CREATURE_DESCRIPTIONS[portrait.creature];
   const quality = RARITY_QUALITY[portrait.rarity] || RARITY_QUALITY.common;
 
-  return `Gaming-themed collectible card art: ${creature} in a ${portrait.art_scene}. ${element}. Mood: ${portrait.art_mood}. Style: ${quality}. Aspect ratio 5:3, no text, no borders, vibrant colors, centered composition.`;
+  if (!creature) {
+    console.warn(`[art] Unknown creature "${portrait.creature}", falling back to phoenix`);
+  }
+  console.log(`[art] Creature: ${portrait.creature}, Element: ${portrait.element}, Rarity: ${portrait.rarity}`);
+
+  const creatureDesc = creature || CREATURE_DESCRIPTIONS.phoenix;
+
+  return `Gaming-themed collectible card art: ${creatureDesc} in a ${portrait.art_scene}. ${element}. Mood: ${portrait.art_mood}. Style: ${quality}. Aspect ratio 5:3, no text, no borders, vibrant colors, centered composition.`;
 }

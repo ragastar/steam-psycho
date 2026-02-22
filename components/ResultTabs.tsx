@@ -83,13 +83,57 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
     { id: "deepdive", label: t("tabs.deepDive"), icon: "🔍" },
   ];
 
+  const isRu = locale === "ru";
+  const playedPct = 100 - profile.stats.unplayedPercentage;
   const statItems = [
-    { key: "dedication", label: t("stats.dedication"), value: portrait.stats.dedication },
-    { key: "mastery", label: t("stats.mastery"), value: portrait.stats.mastery },
-    { key: "exploration", label: t("stats.exploration"), value: portrait.stats.exploration },
-    { key: "hoarding", label: t("stats.hoarding"), value: portrait.stats.hoarding },
-    { key: "social", label: t("stats.social"), value: portrait.stats.social },
-    { key: "veteran", label: t("stats.veteran"), value: portrait.stats.veteran },
+    {
+      key: "dedication",
+      label: t("stats.dedication"),
+      value: portrait.stats.dedication,
+      explanation: isRu
+        ? `${profile.stats.totalPlaytimeHours} ч в играх, ${playedPct}% библиотеки запущено`
+        : `${profile.stats.totalPlaytimeHours}h played, ${playedPct}% of library launched`,
+    },
+    {
+      key: "mastery",
+      label: t("stats.mastery"),
+      value: portrait.stats.mastery,
+      explanation: isRu
+        ? `Топ-3 игры = ${profile.concentrationRatio}% времени, ~${profile.stats.avgPlaytimeHours} ч на игру`
+        : `Top 3 games = ${profile.concentrationRatio}% of playtime, ~${profile.stats.avgPlaytimeHours}h per game`,
+    },
+    {
+      key: "exploration",
+      label: t("stats.exploration"),
+      value: portrait.stats.exploration,
+      explanation: isRu
+        ? `${profile.stats.totalGames} игр, ${profile.genreDistribution.length} жанров, концентрация ${profile.concentrationRatio}%`
+        : `${profile.stats.totalGames} games, ${profile.genreDistribution.length} genres, ${profile.concentrationRatio}% concentration`,
+    },
+    {
+      key: "hoarding",
+      label: t("stats.hoarding"),
+      value: portrait.stats.hoarding,
+      explanation: isRu
+        ? `${profile.stats.unplayedCount} незапущенных игр (${profile.stats.unplayedPercentage}% библиотеки)`
+        : `${profile.stats.unplayedCount} unplayed games (${profile.stats.unplayedPercentage}% of library)`,
+    },
+    {
+      key: "social",
+      label: t("stats.social"),
+      value: portrait.stats.social,
+      explanation: isRu
+        ? `${profile.social.friendsCount} друзей, ${profile.multiplayerRatio}% мультиплеер`
+        : `${profile.social.friendsCount} friends, ${profile.multiplayerRatio}% multiplayer`,
+    },
+    {
+      key: "veteran",
+      label: t("stats.veteran"),
+      value: portrait.stats.veteran,
+      explanation: isRu
+        ? `Аккаунт ${profile.timeline.accountAge} лет, уровень ${profile.player.steamLevel}, ${profile.badges.totalCount} значков`
+        : `Account ${profile.timeline.accountAge}y old, level ${profile.player.steamLevel}, ${profile.badges.totalCount} badges`,
+    },
   ];
 
   return (
@@ -210,6 +254,7 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                     perHour: t("deepDive.economics.perHour"),
                     bestDeal: t("deepDive.economics.bestDeal"),
                     freeGames: t("deepDive.economics.freeGames"),
+                    disclaimer: t("deepDive.economics.disclaimer"),
                   }}
                 />
                 <AchievementsCard

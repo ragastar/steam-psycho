@@ -9,21 +9,6 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchSteamSpyTags(appId: number): Promise<Record<string, number>> {
-  return cached(`steam:tags:${appId}`, 7 * 24 * 3600, async () => {
-    try {
-      const res = await fetch(`${STEAMSPY_BASE}?request=appdetails&appid=${appId}`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!res.ok) return {};
-      const data: SteamSpyAppData = await res.json();
-      return data.tags || {};
-    } catch {
-      return {};
-    }
-  });
-}
-
 async function fetchSteamSpyAppData(appId: number): Promise<SteamSpyAppData | null> {
   return cached(`steam:spy:${appId}`, 7 * 24 * 3600, async () => {
     try {
@@ -36,6 +21,14 @@ async function fetchSteamSpyAppData(appId: number): Promise<SteamSpyAppData | nu
       return null;
     }
   });
+}
+
+/** Parse SteamSpy price string (cents) to dollars */
+function parseSteamSpyPrice(spyData: SteamSpyAppData | null): number | undefined {
+  if (!spyData?.initialprice) return undefined;
+  const cents = parseInt(spyData.initialprice, 10);
+  if (isNaN(cents) || cents <= 0) return undefined;
+  return cents / 100;
 }
 
 interface StoreEnrichResult {
@@ -69,40 +62,65 @@ export async function enrichGames(
   games: OwnedGame[],
   topN: number = 30,
 ): Promise<EnrichedGame[]> {
-  // Sort by playtime, take top N
+  // Sort by playtime, take top N for full enrichment (tags, genres, store prices)
   const sorted = [...games].sort((a, b) => b.playtime_forever - a.playtime_forever);
   const topGames = sorted.slice(0, topN);
 
   const enriched: EnrichedGame[] = [];
 
   for (const game of topGames) {
-    const [tags, storeData, spyData] = await Promise.all([
-      fetchSteamSpyTags(game.appid),
-      fetchStoreData(game.appid),
+    // Single SteamSpy request for tags + price + avg playtime
+    const [spyData, storeData] = await Promise.all([
       fetchSteamSpyAppData(game.appid),
+      fetchStoreData(game.appid),
     ]);
+
+    const tags = spyData?.tags || {};
+    // Store price preferred, SteamSpy initialprice as fallback
+    const price = storeData.price ?? parseSteamSpyPrice(spyData);
+    const isFree = storeData.isFree || (spyData?.initialprice === "0" && !price);
 
     enriched.push({
       ...game,
       tags,
       genres: storeData.genres,
-      price: storeData.price,
-      isFree: storeData.isFree,
+      price,
+      isFree,
       averageForever: spyData?.average_forever,
     });
 
     await delay(DELAY_MS);
   }
 
-  // Add remaining games without enrichment
-  const remainingGames = sorted.slice(topN).map((game) => ({
-    ...game,
-    tags: {},
-    genres: [],
-    price: undefined,
-    isFree: false,
-    averageForever: undefined,
-  }));
+  // Remaining games: fetch only SteamSpy for price (no Store API — saves time)
+  const remaining = sorted.slice(topN);
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
+    const batch = remaining.slice(i, i + BATCH_SIZE);
+    const spyResults = await Promise.all(
+      batch.map((game) => fetchSteamSpyAppData(game.appid)),
+    );
 
-  return [...enriched, ...remainingGames];
+    for (let j = 0; j < batch.length; j++) {
+      const game = batch[j];
+      const spyData = spyResults[j];
+      const price = parseSteamSpyPrice(spyData);
+      const isFree = spyData?.initialprice === "0" && !price;
+
+      enriched.push({
+        ...game,
+        tags: {},
+        genres: [],
+        price,
+        isFree,
+        averageForever: spyData?.average_forever,
+      });
+    }
+
+    if (i + BATCH_SIZE < remaining.length) {
+      await delay(DELAY_MS);
+    }
+  }
+
+  return enriched;
 }

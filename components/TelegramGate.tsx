@@ -12,6 +12,7 @@ interface TelegramGateProps {
 
 const LS_PREFIX = "gate:";
 const POLL_INTERVAL = 3000;
+const MAX_CONSECUTIVE_ERRORS = 3;
 
 export function TelegramGate({ steamId64, locale, children }: TelegramGateProps) {
   const t = useTranslations("gate");
@@ -22,6 +23,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const errorCountRef = useRef(0);
 
   const lsKey = `${LS_PREFIX}${steamId64}`;
 
@@ -29,9 +31,14 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
     try {
       const res = await fetch(`/api/gate/status?token=${tk}`);
       if (!res.ok) {
-        setUnlocked(true);
+        // Don't unlock on transient errors — only after multiple consecutive failures
+        errorCountRef.current += 1;
+        if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
+          setUnlocked(true);
+        }
         return;
       }
+      errorCountRef.current = 0; // Reset on success
       const data = await res.json();
       if (data.status === "unlocked") {
         setUnlocked(true);
@@ -42,8 +49,11 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
         setToken(null);
       }
     } catch {
-      // Graceful degradation
-      setUnlocked(true);
+      // Don't unlock on transient network errors (e.g. mobile screenshot suspension)
+      errorCountRef.current += 1;
+      if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
+        setUnlocked(true);
+      }
     }
   }, [lsKey]);
 
@@ -55,8 +65,8 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
         body: JSON.stringify({ steamId64, locale }),
       });
       if (!res.ok) {
-        setUnlocked(true);
-        return;
+        // Keep gate locked, just show without token — user can still click the bot link
+        return null;
       }
       const data = await res.json();
       const tk = data.token as string;
@@ -64,8 +74,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
       localStorage.setItem(lsKey, JSON.stringify({ token: tk, unlocked: false }));
       return tk;
     } catch {
-      // Graceful degradation
-      setUnlocked(true);
+      // Keep gate locked on network error — don't unlock on transient failures
       return null;
     }
   }, [steamId64, locale, lsKey]);

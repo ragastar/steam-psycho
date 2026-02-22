@@ -25,7 +25,11 @@ export function StatsGrid({ stats, barClass, gradientClass }: StatsGridProps) {
         <h3 className="text-xs text-gray-500 uppercase tracking-wider">Stats</h3>
         <button
           onClick={() => setShowExplanations(!showExplanations)}
-          className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+          className={`w-5 h-5 rounded-full text-xs font-bold transition-all ${
+            showExplanations
+              ? "bg-purple-500 text-white shadow-lg shadow-purple-500/30"
+              : "bg-gray-700 text-gray-300 hover:bg-purple-500/50 hover:text-white"
+          }`}
         >
           {showExplanations ? "×" : "?"}
         </button>

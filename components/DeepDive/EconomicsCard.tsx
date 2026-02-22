@@ -9,6 +9,7 @@ interface EconomicsCardProps {
     perHour: string;
     bestDeal: string;
     freeGames: string;
+    disclaimer: string;
   };
 }
 
@@ -30,6 +31,9 @@ export function EconomicsCard({ economics, labels }: EconomicsCardProps) {
           </p>
         </div>
       )}
+      <p className="text-[10px] text-gray-600 mt-3 pt-2 border-t border-gray-800/50 italic">
+        {labels.disclaimer}
+      </p>
     </div>
   );
 }
