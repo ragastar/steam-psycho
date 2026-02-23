@@ -18,13 +18,24 @@ interface CardIdentity {
 // --- Creature selection based on dominant stat + secondary ---
 
 const STAT_CREATURES: Record<string, Creature[]> = {
-  dedication: ["phoenix", "bear", "stag"],      // loyalty, endurance, persistence
-  mastery: ["dragon", "tiger", "falcon"],        // power, precision, speed
-  exploration: ["fox", "griffin", "chimera"],     // cunning, variety, hybrid
-  hoarding: ["wraith", "serpent", "hydra"],       // collector, coiled, many-headed
-  social: ["wolf", "kraken", "panther"],          // pack, reach, charisma
-  veteran: ["owl", "sphinx", "raven"],            // wisdom, riddle, memory
+  dedication: ["phoenix", "bear", "stag", "wolf", "tiger"],
+  mastery: ["dragon", "tiger", "falcon", "phoenix", "panther"],
+  exploration: ["fox", "griffin", "chimera", "raven", "sphinx"],
+  hoarding: ["wraith", "serpent", "hydra", "kraken", "owl"],
+  social: ["wolf", "kraken", "panther", "griffin", "fox"],
+  veteran: ["owl", "sphinx", "raven", "stag", "dragon"],
 };
+
+// --- Deterministic hash for creature variation ---
+
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
 
 // --- Element selection based on top genres/tags ---
 
@@ -44,6 +55,7 @@ const GENRE_ELEMENTS: [RegExp, Element][] = [
 export function selectCardIdentity(
   profile: AggregatedProfile,
   cardStats: CardStats,
+  steamId64: string,
 ): CardIdentity {
   // --- Select creature ---
   const stats: [string, number][] = [
@@ -61,22 +73,23 @@ export function selectCardIdentity(
   const primaryCreatures = STAT_CREATURES[primaryStat];
   const secondaryCreatures = STAT_CREATURES[secondaryStat];
 
-  // Use combination of primary stat value + secondary to pick variant
-  // This gives 3 creatures per stat × 6 stats = 18 unique creatures
+  // Hash-based creature selection for diversity across users
   const primaryValue = stats[0][1];
   const secondaryValue = stats[1][1];
   const spread = primaryValue - secondaryValue;
+  const hash = hashCode(steamId64);
 
   let creature: Creature;
   if (spread > 20) {
-    // Dominant stat — pick iconic creature (index 0)
-    creature = primaryCreatures[0];
+    // Dominant stat — iconic, but with hash variation
+    creature = primaryCreatures[hash % 2];
   } else if (spread > 8) {
-    // Moderate dominance — pick secondary variant
-    creature = primaryCreatures[1];
+    // Moderate dominance — hash across full primary pool
+    creature = primaryCreatures[hash % primaryCreatures.length];
   } else {
-    // Stats are close — pick hybrid from secondary stat
-    creature = secondaryCreatures[2] || primaryCreatures[2];
+    // Stats are close — mix both pools
+    const combined = Array.from(new Set([...primaryCreatures, ...secondaryCreatures]));
+    creature = combined[hash % combined.length];
   }
 
   // --- Select element ---

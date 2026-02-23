@@ -172,89 +172,90 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   locale={locale}
                 />
 
-                <div className="px-6 pb-6 space-y-5 relative z-10">
-                  {/* Rarity badge */}
-                  <div className="flex justify-end">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${badgeClass}`}>
-                      {t(`result.rarity.${rarity}`)}
-                    </span>
-                  </div>
+                <TelegramGate steamId64={steamId64} locale={locale}>
+                  <div className="px-6 pb-6 space-y-5 relative z-10">
+                    {/* Rarity badge */}
+                    <div className="flex justify-end">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${badgeClass}`}>
+                        {t(`result.rarity.${rarity}`)}
+                      </span>
+                    </div>
 
-                  {/* 3 Archetype badges */}
-                  <ArchetypeBadges
-                    primary={portrait.primaryArchetype}
-                    secondary={portrait.secondaryArchetype}
-                    shadow={portrait.shadowArchetype}
-                    labels={{
-                      primary: t("archetypes.primary"),
-                      secondary: t("archetypes.secondary"),
-                      shadow: t("archetypes.shadow"),
-                    }}
-                  />
+                    {/* 3 Archetype badges */}
+                    <ArchetypeBadges
+                      primary={portrait.primaryArchetype}
+                      secondary={portrait.secondaryArchetype}
+                      shadow={portrait.shadowArchetype}
+                      labels={{
+                        primary: t("archetypes.primary"),
+                        secondary: t("archetypes.secondary"),
+                        shadow: t("archetypes.shadow"),
+                      }}
+                    />
 
-                  {/* 6 Stats */}
-                  <StatsGrid stats={statItems} barClass={barClass} gradientClass={gradientClass} />
+                    {/* 6 Stats */}
+                    <StatsGrid stats={statItems} barClass={barClass} gradientClass={gradientClass} />
 
-                  {/* Quote */}
-                  <div className="text-center italic text-gray-300 border-t border-gray-800 pt-4">
-                    &ldquo;{portrait.quote}&rdquo;
-                  </div>
+                    {/* Quote */}
+                    <div className="text-center italic text-gray-300 border-t border-gray-800 pt-4">
+                      &ldquo;{portrait.quote}&rdquo;
+                    </div>
 
-                  {/* Lore */}
-                  <p className="text-sm text-gray-400 leading-relaxed">{portrait.lore}</p>
+                    {/* Lore */}
+                    <p className="text-sm text-gray-400 leading-relaxed">{portrait.lore}</p>
 
-                  {/* Roasts in TelegramGate */}
-                  <TelegramGate steamId64={steamId64} locale={locale}>
+                    {/* Roasts */}
                     <div className="space-y-4">
                       <RoastsList roasts={portrait.roasts} />
                     </div>
-                  </TelegramGate>
 
-                  {/* Top 5 Games */}
-                  <section>
-                    <h2 className="text-sm font-semibold text-gray-300 mb-2">{t("result.topGames")}</h2>
-                    <TopGamesCompact games={profile.topGames} barClass={barClass} />
-                  </section>
+                    {/* Top 5 Games */}
+                    <section>
+                      <h2 className="text-sm font-semibold text-gray-300 mb-2">{t("result.topGames")}</h2>
+                      <TopGamesCompact games={profile.topGames} barClass={barClass} />
+                    </section>
 
-                  {/* 3 Metric cards */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <MetricCard
-                      label={t("result.totalGames")}
-                      value={String(profile.stats.totalGames)}
-                      sub={`Top ${100 - profile.ranks.librarySizePercentile}%`}
-                    />
-                    <MetricCard
-                      label={t("result.totalHours")}
-                      value={String(profile.stats.totalPlaytimeHours)}
-                      sub={`Top ${100 - profile.ranks.hoursPercentile}%`}
-                    />
-                    <MetricCard
-                      label={t("result.steamLevel")}
-                      value={String(profile.player.steamLevel)}
-                    />
-                  </div>
-
-                  {/* Spirit bar */}
-                  <div className="flex items-center gap-4 border-t border-gray-800 pt-4">
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-500 uppercase tracking-wider">{t("result.spiritGame")}</p>
-                      <p className={`text-sm font-bold bg-gradient-to-r ${gradientClass} bg-clip-text text-transparent`}>
-                        {portrait.spirit_game}
-                      </p>
+                    {/* 3 Metric cards */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <MetricCard
+                        label={t("result.totalGames")}
+                        value={String(profile.stats.totalGames)}
+                        sub={`Top ${100 - profile.ranks.librarySizePercentile}%`}
+                      />
+                      <MetricCard
+                        label={t("result.totalHours")}
+                        value={String(profile.stats.totalPlaytimeHours)}
+                        sub={`Top ${100 - profile.ranks.hoursPercentile}%`}
+                      />
+                      <MetricCard
+                        label={t("result.steamLevel")}
+                        value={String(profile.player.steamLevel)}
+                      />
                     </div>
-                    <div className="flex-1 text-right">
-                      <p className="text-xs text-gray-500 uppercase tracking-wider">{t("result.spiritAnimal")}</p>
-                      <p className="text-sm text-gray-300">
-                        {portrait.spirit_animal.name}
-                      </p>
+
+                    {/* Spirit bar */}
+                    <div className="flex items-center gap-4 border-t border-gray-800 pt-4">
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 uppercase tracking-wider">{t("result.spiritGame")}</p>
+                        <p className={`text-sm font-bold bg-gradient-to-r ${gradientClass} bg-clip-text text-transparent`}>
+                          {portrait.spirit_game}
+                        </p>
+                      </div>
+                      <div className="flex-1 text-right">
+                        <p className="text-xs text-gray-500 uppercase tracking-wider">{t("result.spiritAnimal")}</p>
+                        <p className="text-sm text-gray-300">
+                          {portrait.spirit_animal.name}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </TelegramGate>
               </div>
             </div>
           )}
 
           {activeTab === "psycho" && portrait.psycho_profile && (
+            <TelegramGate steamId64={steamId64} locale={locale}>
             <div className="space-y-4">
               <PsychSummaryCard
                 summary={portrait.psycho_profile.psych_summary}
@@ -313,6 +314,7 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                 }}
               />
             </div>
+            </TelegramGate>
           )}
 
           {activeTab === "deepdive" && (

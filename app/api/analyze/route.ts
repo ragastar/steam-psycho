@@ -159,7 +159,7 @@ export async function POST(req: Request) {
     const rarity = calculateRarity(profile);
 
     // 8. Select card identity (creature + element) algorithmically
-    const cardIdentity = selectCardIdentity(profile, cardStats);
+    const cardIdentity = selectCardIdentity(profile, cardStats, steamId64);
 
     // 9. Generate portrait via LLM
     const portrait = await generatePortrait(profile, cardStats, rarity, locale, provider);

@@ -1,7 +1,8 @@
-import { getCache } from "@/lib/cache/redis";
-import { portraitKey, profileKey } from "@/lib/cache/keys";
+import { getCache, setCache } from "@/lib/cache/redis";
+import { portraitKey, profileKey, CACHE_TTL } from "@/lib/cache/keys";
 import type { CardPortrait } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
+import { translatePortrait } from "@/lib/llm/translate";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { ShareButtons } from "@/components/ShareButtons";
@@ -43,8 +44,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ResultPage({ params }: Props) {
   const t = await getTranslations();
-  const portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
+  let portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
+
+  // Fallback: translate from other locale instead of showing "expired"
+  if (!portrait && profile) {
+    const otherLocale = params.locale === "ru" ? "en" : "ru";
+    const otherPortrait = await getCache<CardPortrait>(portraitKey(params.id, otherLocale));
+    if (otherPortrait) {
+      portrait = await translatePortrait(otherPortrait, otherLocale, params.locale);
+      if (portrait) {
+        await setCache(portraitKey(params.id, params.locale), portrait, CACHE_TTL.portrait);
+      }
+    }
+  }
 
   if (!portrait || !profile) {
     return (
