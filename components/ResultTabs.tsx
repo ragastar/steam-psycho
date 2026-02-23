@@ -321,13 +321,19 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
             <TelegramGate steamId64={steamId64} locale={locale}>
               <div className="space-y-4">
                 <EconomicsCard
-                  economics={profile.economics}
+                  stats={profile.stats}
+                  multiplayerRatio={profile.multiplayerRatio}
+                  singleplayerRatio={profile.singleplayerRatio}
+                  freePercentage={profile.economics.freePercentage}
                   labels={{
                     title: t("deepDive.economics.title"),
-                    libraryValue: t("deepDive.economics.libraryValue"),
-                    wasted: t("deepDive.economics.wasted"),
+                    played: t("deepDive.economics.played"),
+                    unplayed: t("deepDive.economics.unplayed"),
+                    avgPerGame: t("deepDive.economics.avgPerGame"),
+                    multiplayer: t("deepDive.economics.multiplayer"),
+                    singleplayer: t("deepDive.economics.singleplayer"),
                     freeGames: t("deepDive.economics.freeGames"),
-                    disclaimer: t("deepDive.economics.disclaimer"),
+                    hours: t("deepDive.economics.hours"),
                   }}
                 />
                 <AchievementsCard
@@ -379,8 +385,11 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   labels={{
                     title: t("deepDive.patterns.title"),
                     genreConcentration: t("deepDive.patterns.genreConcentration"),
+                    genreConcentrationDesc: t("deepDive.patterns.genreConcentrationDesc"),
                     bingeStyle: t("deepDive.patterns.bingeStyle"),
+                    bingeDesc: t("deepDive.patterns.bingeDesc"),
                     indieGames: t("deepDive.patterns.indieGames"),
+                    indieDesc: t("deepDive.patterns.indieDesc"),
                     binger: t("deepDive.patterns.binger"),
                     sampler: t("deepDive.patterns.sampler"),
                     balanced: t("deepDive.patterns.balanced"),
@@ -390,19 +399,27 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   ranks={profile.ranks}
                   labels={{
                     title: t("deepDive.ranks.title"),
+                    subtitle: t("deepDive.ranks.subtitle"),
                     hours: t("deepDive.ranks.hours"),
+                    hoursDesc: t("deepDive.ranks.hoursDesc"),
                     library: t("deepDive.ranks.library"),
+                    libraryDesc: t("deepDive.ranks.libraryDesc"),
                     concentration: t("deepDive.ranks.concentration"),
+                    concentrationDesc: t("deepDive.ranks.concentrationDesc"),
                     veteran: t("deepDive.ranks.veteran"),
+                    veteranDesc: t("deepDive.ranks.veteranDesc"),
                   }}
                 />
                 <BadgesCard
                   badges={profile.badges}
+                  steamLevel={profile.player.steamLevel}
                   labels={{
                     title: t("deepDive.badges.title"),
                     total: t("deepDive.badges.total"),
                     xp: t("deepDive.badges.xp"),
+                    level: t("deepDive.badges.level"),
                     rarest: t("deepDive.badges.rarest"),
+                    rarestOwners: t("deepDive.badges.rarestOwners"),
                     noData: t("deepDive.badges.noData"),
                   }}
                 />

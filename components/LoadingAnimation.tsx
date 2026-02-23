@@ -76,16 +76,10 @@ export function LoadingAnimation() {
         <motion.p
           key={displayKey}
           initial={{ opacity: 0, y: 10 }}
-          animate={isFinished
-            ? { opacity: [0.7, 1, 0.7], y: 0 }
-            : { opacity: 1, y: 0 }
-          }
+          animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          transition={isFinished
-            ? { opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" }, y: { duration: 0.3 } }
-            : { duration: 0.3 }
-          }
-          className="text-gray-300 text-sm text-center max-w-xs"
+          transition={{ duration: 0.3 }}
+          className={`text-gray-300 text-sm text-center max-w-xs ${isFinished ? "animate-pulse" : ""}`}
         >
           {displayText}
         </motion.p>

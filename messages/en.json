@@ -28,7 +28,7 @@
   },
   "tabs": {
     "card": "Card",
-    "deepDive": "Deep Dive",
+    "deepDive": "Analytics",
     "psychoProfile": "Psycho Profile",
     "artGen": "AI Art"
   },
@@ -74,13 +74,14 @@
   },
   "deepDive": {
     "economics": {
-      "title": "Library Economics",
-      "libraryValue": "Library Value",
-      "wasted": "Wasted (Unplayed)",
-      "perHour": "Cost per Hour",
-      "bestDeal": "Best Deal",
-      "freeGames": "Free Games",
-      "disclaimer": "Prices are approximate, based on current Steam prices. This section is being improved."
+      "title": "Library Overview",
+      "played": "Played",
+      "unplayed": "Unplayed",
+      "avgPerGame": "Avg per game (h)",
+      "multiplayer": "Multiplayer",
+      "singleplayer": "Singleplayer",
+      "freeGames": "Free games",
+      "hours": "h"
     },
     "achievements": {
       "title": "Achievements",
@@ -114,24 +115,34 @@
     "patterns": {
       "title": "Behavioral Patterns",
       "genreConcentration": "Genre Focus",
+      "genreConcentrationDesc": "% of playtime in your top genre. Above 50% = genre loyalist, below 30% = omnivore",
       "bingeStyle": "Play Style",
+      "bingeDesc": "How you spread your time: deep into one game, sampling everything, or balanced",
       "indieGames": "Indie Games",
+      "indieDesc": "Share of indie games in your library. Above 40% = indie connoisseur",
       "binger": "Binger",
       "sampler": "Sampler",
       "balanced": "Balanced"
     },
     "ranks": {
-      "title": "Percentiles",
-      "hours": "Hours",
-      "library": "Library",
-      "concentration": "Concentration",
-      "veteran": "Veteran"
+      "title": "Among All Players",
+      "subtitle": "Your rank compared to other Steam gamers",
+      "hours": "Hours Played",
+      "hoursDesc": "Total playtime compared to others",
+      "library": "Library Size",
+      "libraryDesc": "Number of games in your collection",
+      "concentration": "Focus",
+      "concentrationDesc": "How much you stick to your top games",
+      "veteran": "Steam Veteran",
+      "veteranDesc": "Account age + level + badges"
     },
     "badges": {
       "title": "Steam Badges",
-      "total": "Total Badges",
-      "xp": "Experience",
-      "rarest": "Rarest",
+      "total": "Badges",
+      "xp": "Experience (XP)",
+      "level": "Level",
+      "rarest": "Rarest Badge",
+      "rarestOwners": "owners",
       "noData": "No badge data available"
     }
   },
