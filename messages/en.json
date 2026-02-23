@@ -17,8 +17,14 @@
     "step1": "Finding profile...",
     "step2": "Loading library...",
     "step3": "Analyzing genres and tags...",
-    "step4": "Creating your collectible card...",
-    "step5": "Final touches..."
+    "step4": "Gathering achievements...",
+    "step5": "Creating your collectible card...",
+    "step6": "Final touches...",
+    "step7": "Almost there...",
+    "step8": "Just a bit more, it's worth the wait...",
+    "funFact1": "Did you know? The average Steam library has 89 games",
+    "funFact2": "Fun fact: 37% of Steam games have never been launched by their owners",
+    "funFact3": "Did you know? The average gamer plays 7.5 hours per week"
   },
   "tabs": {
     "card": "Card",

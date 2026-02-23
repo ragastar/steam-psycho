@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 
-const STEP_DURATION = 3000;
+const STEP_DURATIONS = [3000, 3000, 3000, 4000, 4000, 3000, 5000, 5000]; // 30s total
+const FUN_FACT_INTERVAL = 4000;
 
 export function LoadingAnimation() {
   const t = useTranslations("loading");
   const [step, setStep] = useState(0);
+  const [funFactIndex, setFunFactIndex] = useState(0);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const steps = [
     t("step1"),
@@ -16,14 +19,43 @@ export function LoadingAnimation() {
     t("step3"),
     t("step4"),
     t("step5"),
+    t("step6"),
+    t("step7"),
+    t("step8"),
   ];
 
+  const funFacts = [
+    t("funFact1"),
+    t("funFact2"),
+    t("funFact3"),
+  ];
+
+  const totalSteps = steps.length;
+  const isFinished = step >= totalSteps;
+
+  // Progress through steps with increasing durations
   useEffect(() => {
+    if (step < totalSteps) {
+      timeoutRef.current = setTimeout(() => {
+        setStep((prev) => prev + 1);
+      }, STEP_DURATIONS[step]);
+      return () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      };
+    }
+  }, [step, totalSteps]);
+
+  // Rotate fun facts after all steps complete
+  useEffect(() => {
+    if (!isFinished) return;
     const interval = setInterval(() => {
-      setStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
-    }, STEP_DURATION);
+      setFunFactIndex((prev) => (prev + 1) % funFacts.length);
+    }, FUN_FACT_INTERVAL);
     return () => clearInterval(interval);
-  }, [steps.length]);
+  }, [isFinished, funFacts.length]);
+
+  const displayText = isFinished ? funFacts[funFactIndex] : steps[step];
+  const displayKey = isFinished ? `fact-${funFactIndex}` : `step-${step}`;
 
   return (
     <div className="flex flex-col items-center gap-6 py-8">
@@ -42,13 +74,20 @@ export function LoadingAnimation() {
 
       <AnimatePresence mode="wait">
         <motion.p
-          key={step}
+          key={displayKey}
           initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={isFinished
+            ? { opacity: [0.7, 1, 0.7], y: 0 }
+            : { opacity: 1, y: 0 }
+          }
           exit={{ opacity: 0, y: -10 }}
-          className="text-gray-300 text-sm"
+          transition={isFinished
+            ? { opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" }, y: { duration: 0.3 } }
+            : { duration: 0.3 }
+          }
+          className="text-gray-300 text-sm text-center max-w-xs"
         >
-          {steps[step]}
+          {displayText}
         </motion.p>
       </AnimatePresence>
 
@@ -57,7 +96,7 @@ export function LoadingAnimation() {
           <div
             key={i}
             className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-              i <= step ? "bg-purple-500" : "bg-gray-700"
+              i <= step - 1 || isFinished ? "bg-purple-500" : "bg-gray-700"
             }`}
           />
         ))}
