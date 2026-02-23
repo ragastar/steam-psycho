@@ -1,6 +1,7 @@
 import { getBot } from "./bot";
 import { getCache, setCache } from "@/lib/cache/redis";
 import { CACHE_TTL, gateTokenKey } from "@/lib/cache/keys";
+import { logGateEvent } from "@/lib/analytics/db";
 
 interface GateData {
   steamId64: string;
@@ -74,8 +75,10 @@ export function registerHandlers() {
 
       if (isSubscribed) {
         await setCache(gateTokenKey(token), { ...data, status: "unlocked" }, CACHE_TTL.gate);
+        logGateEvent({ steamId64: data.steamId64, event: "unlocked" });
         await ctx.reply(msg.unlocked);
       } else {
+        logGateEvent({ steamId64: data.steamId64, event: "not_subscribed" });
         await ctx.reply(msg.notSubscribed);
       }
     } catch (err) {

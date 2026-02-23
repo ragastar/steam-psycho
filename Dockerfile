@@ -1,6 +1,8 @@
 # Stage 1: Dependencies
 FROM node:22-alpine AS deps
 WORKDIR /app
+# Build tools for native modules (better-sqlite3)
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -22,8 +24,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Persistent art storage directory (mounted as Docker volume)
-RUN mkdir -p /data/art && chown nextjs:nodejs /data/art
+# Persistent storage directories (mounted as Docker volumes)
+RUN mkdir -p /data/art /data/db && chown -R nextjs:nodejs /data
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

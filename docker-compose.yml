@@ -7,8 +7,11 @@ services:
       - "3001:3000"
     volumes:
       - art-data:/data/art
+      - db-data:/data/db
     environment:
       - ART_STORAGE_PATH=/data/art
+      - ANALYTICS_DB_PATH=/data/db/analytics.db
 
 volumes:
   art-data:
+  db-data:

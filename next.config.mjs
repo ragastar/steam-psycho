@@ -13,7 +13,7 @@ const nextConfig = {
     ],
   },
   experimental: {
-    serverComponentsExternalPackages: ["@resvg/resvg-js"],
+    serverComponentsExternalPackages: ["@resvg/resvg-js", "better-sqlite3"],
   },
 };
 

@@ -5,6 +5,7 @@ import type { CardPortrait } from "@/lib/llm/types";
 import { buildImagePrompt } from "@/lib/art/prompt-builder";
 import { generateArtImage } from "@/lib/art/image-client";
 import type { Element } from "@/lib/art/card-identity";
+import { logArtGeneration, logError } from "@/lib/analytics/db";
 
 interface CardIdentity {
   creature: string;
@@ -30,10 +31,12 @@ export async function POST(req: Request) {
 
     const imagePrompt = buildImagePrompt(portrait, element);
     const result = await generateArtImage(steamId64, imagePrompt);
+    logArtGeneration({ steamId64, cached: false });
 
     return NextResponse.json(result);
   } catch (err) {
     console.error("Art generation error:", err);
+    logError({ type: "ART_ERROR", message: err instanceof Error ? err.message : "Unknown", endpoint: "/api/art/generate" });
     return NextResponse.json({ error: "Art generation failed" }, { status: 500 });
   }
 }

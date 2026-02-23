@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { setCache } from "@/lib/cache/redis";
 import { CACHE_TTL, gateTokenKey } from "@/lib/cache/keys";
 import crypto from "crypto";
+import { logGateEvent } from "@/lib/analytics/db";
 
 export async function POST(req: Request) {
   try {
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
       { steamId64, locale: locale || "ru", status: "pending" },
       CACHE_TTL.gate,
     );
+
+    logGateEvent({ steamId64, event: "created" });
 
     return NextResponse.json({ token });
   } catch {

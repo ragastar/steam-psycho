@@ -18,6 +18,8 @@ import type { AchievementGameData } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { CACHE_TTL, portraitKey, profileKey, rateLimitKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
+import { logAnalysis, logError } from "@/lib/analytics/db";
+import { hashIp } from "@/lib/analytics/hash";
 
 const ERROR_CODES: Record<string, number> = {
   INVALID_INPUT: 400,
@@ -93,8 +95,11 @@ export async function POST(req: Request) {
     const steamId64 = await resolveToSteamId64(input);
 
     // 2. Check cache for existing portrait
+    const ipHash = hashIp(ip);
+
     const cachedPortrait = await getCache(portraitKey(steamId64, locale));
     if (cachedPortrait) {
+      logAnalysis({ steamId64, locale, cached: true, ipHash });
       return NextResponse.json({ steamId64, cached: true });
     }
 
@@ -171,9 +176,27 @@ export async function POST(req: Request) {
       setCache(`art:identity:${steamId64}`, cardIdentity, CACHE_TTL.portrait),
     ]);
 
+    logAnalysis({
+      steamId64, locale, cached: false, ipHash,
+      rarity,
+      stats: cardStats,
+      primaryArchetype: portrait.primaryArchetype?.name,
+      spiritAnimal: portrait.spirit_animal?.name,
+      element: cardIdentity.element,
+      librarySize: games.length,
+      totalPlaytimeHours: games.reduce((s, g) => s + g.playtime_forever, 0) / 60,
+      accountAgeYears: profile.timeline?.accountAge,
+      llmProvider: provider || process.env.LLM_PROVIDER || "openai",
+    });
+
     return NextResponse.json({ steamId64, cached: false });
   } catch (err) {
+    const forwarded2 = req.headers.get("x-forwarded-for");
+    const errIp = forwarded2?.split(",")[0]?.trim() || "unknown";
+    const errIpHash = hashIp(errIp);
+
     if (err instanceof SteamApiError) {
+      logError({ type: err.code, message: err.message, ipHash: errIpHash, endpoint: "/api/analyze" });
       return NextResponse.json(
         { error: true, code: err.code, message: err.message },
         { status: ERROR_CODES[err.code] || 500 },
@@ -181,6 +204,7 @@ export async function POST(req: Request) {
     }
 
     if (err instanceof Error && err.message === "INVALID_INPUT") {
+      logError({ type: "INVALID_INPUT", message: "Invalid input format", ipHash: errIpHash, endpoint: "/api/analyze" });
       return NextResponse.json(
         { error: true, code: "INVALID_INPUT", message: "Invalid input format" },
         { status: 400 },
@@ -188,6 +212,7 @@ export async function POST(req: Request) {
     }
 
     console.error("Analysis error:", err);
+    logError({ type: "ANALYSIS_ERROR", message: err instanceof Error ? err.message : "Unknown", ipHash: errIpHash, endpoint: "/api/analyze" });
     return NextResponse.json(
       { error: true, code: "ANALYSIS_ERROR", message: "Analysis failed" },
       { status: 500 },
