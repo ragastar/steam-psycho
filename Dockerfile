@@ -10,6 +10,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN mkdir -p public
+ENV NEXT_PUBLIC_BASE_URL=https://gamertype.fun
 RUN npm run build
 
 # Stage 3: Runner
