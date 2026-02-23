@@ -16,7 +16,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://gamertype.fun";
 
   if (!portrait || !profile) {
     return { title: "GamerType" };
