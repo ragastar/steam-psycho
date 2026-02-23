@@ -14,11 +14,14 @@ export async function GET(
 
   const filePath = getArtFilePath(steamId64);
   const buffer = fs.readFileSync(filePath);
+  const stat = fs.statSync(filePath);
+  const etag = `"${stat.mtimeMs.toString(36)}-${stat.size.toString(36)}"`;
 
   return new NextResponse(buffer, {
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=2592000, immutable",
+      "Cache-Control": "public, max-age=3600, must-revalidate",
+      "ETag": etag,
     },
   });
 }
