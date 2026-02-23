@@ -14,7 +14,7 @@ interface DataMappingProps {
 export function DataMapping({ portrait, labels }: DataMappingProps) {
   const items = [
     portrait.element ? { label: labels.element, value: portrait.element, icon: getElementIcon(portrait.element) } : null,
-    portrait.creature ? { label: labels.creature, value: portrait.creature, icon: getCreatureIcon(portrait.creature) } : null,
+    portrait.spirit_animal?.name ? { label: labels.creature, value: portrait.spirit_animal.name, icon: getCreatureIcon(portrait.spirit_animal.name) } : null,
     { label: labels.mood, value: portrait.art_mood },
     { label: labels.scene, value: portrait.art_scene },
   ].filter(Boolean) as { label: string; value: string; icon?: string }[];

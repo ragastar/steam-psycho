@@ -1,5 +1,5 @@
 import type { CardPortrait } from "../llm/types";
-import type { Creature, Element } from "./card-identity";
+import type { Element } from "./card-identity";
 
 const ELEMENT_FRAMES: Record<Element, string> = {
   fire: "ornate bronze and crimson metal frame with ember particles, molten cracks glowing orange",
@@ -14,7 +14,7 @@ const ELEMENT_FRAMES: Record<Element, string> = {
   crystal: "translucent prismatic crystal frame, refracting rainbow light, ethereal and delicate",
 };
 
-const CREATURE_DESCRIPTIONS: Record<Creature, string> = {
+const CREATURE_DESCRIPTIONS: Record<string, string> = {
   phoenix: "a majestic phoenix with spread wings, feathers trailing fire and golden light",
   dragon: "a powerful dragon with glowing eyes and armored scales, radiating dominance",
   fox: "a cunning nine-tailed spirit fox, tails flowing with mystical energy",
@@ -43,16 +43,34 @@ const RARITY_STYLE: Record<string, string> = {
   legendary: "extravagant golden frame with divine radiance, holographic prismatic surface, god-rays",
 };
 
+function getCreatureDescription(portrait: CardPortrait): string {
+  const name = portrait.spirit_animal?.name || "phoenix";
+
+  // 1. LLM art_description (primary)
+  if (portrait.spirit_animal?.art_description) {
+    return portrait.spirit_animal.art_description;
+  }
+
+  // 2. Legacy match from 18 known creatures
+  const legacyKey = name.toLowerCase();
+  if (CREATURE_DESCRIPTIONS[legacyKey]) {
+    return CREATURE_DESCRIPTIONS[legacyKey];
+  }
+
+  // 3. Generic fallback
+  return `a mythical ${name}, majestic and powerful`;
+}
+
 export function buildImagePrompt(
   portrait: CardPortrait,
-  creature: Creature,
   element: Element,
 ): string {
   const frame = ELEMENT_FRAMES[element];
-  const creatureDesc = CREATURE_DESCRIPTIONS[creature];
+  const creatureDesc = getCreatureDescription(portrait);
+  const creatureName = portrait.spirit_animal?.name || "phoenix";
   const rarityStyle = RARITY_STYLE[portrait.rarity] || RARITY_STYLE.common;
 
-  console.log(`[art] Creature: ${creature}, Element: ${element}, Rarity: ${portrait.rarity}`);
+  console.log(`[art] Creature: ${creatureName}, Element: ${element}, Rarity: ${portrait.rarity}`);
 
   return [
     `A collectible trading card in the style of Magic: The Gathering.`,

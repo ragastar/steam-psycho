@@ -43,6 +43,7 @@ export type CardStats = z.infer<typeof CardStatsSchema>;
 export const SpiritAnimalSchema = z.object({
   name: z.string(),
   description: z.string(),
+  art_description: z.string().optional(),
 });
 
 export const DecisionStyleEnum = z.enum(["methodical", "impulsive", "completionist", "optimizer", "explorer"]);
@@ -112,7 +113,7 @@ export const CardPortraitSchema = z.object({
   emoji: z.string(),
   rarity: RarityEnum,
   element: ElementEnum.optional(),
-  creature: CreatureEnum.optional(),
+  creature: z.string().optional(),
   stats: CardStatsSchema,
   roasts: z.array(RoastSchema).min(5).max(6),
   spirit_game: z.string(),

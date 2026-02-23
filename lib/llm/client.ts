@@ -53,7 +53,6 @@ async function generateWithAnthropic(
   cardStats: CardStats,
   rarity: Rarity,
   locale: string,
-  creature: string,
   model: string,
 ): Promise<CardPortrait> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -62,7 +61,7 @@ async function generateWithAnthropic(
     model,
     max_tokens: 5000,
     system: getSystemPrompt(locale),
-    messages: [{ role: "user", content: buildUserPrompt(profile, cardStats, rarity, creature) }],
+    messages: [{ role: "user", content: buildUserPrompt(profile, cardStats, rarity) }],
   });
 
   const textBlock = response.content.find((b) => b.type === "text");
@@ -80,7 +79,7 @@ async function generateWithAnthropic(
     max_tokens: 5000,
     system: getSystemPrompt(locale),
     messages: [
-      { role: "user", content: buildUserPrompt(profile, cardStats, rarity, creature) },
+      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
       { role: "assistant", content: textBlock.text },
       {
         role: "user",
@@ -101,7 +100,6 @@ async function generateWithOpenAI(
   cardStats: CardStats,
   rarity: Rarity,
   locale: string,
-  creature: string,
   model: string,
 ): Promise<CardPortrait> {
   const client = new OpenAI({
@@ -114,7 +112,7 @@ async function generateWithOpenAI(
     max_tokens: 5000,
     messages: [
       { role: "system", content: getSystemPrompt(locale) },
-      { role: "user", content: buildUserPrompt(profile, cardStats, rarity, creature) },
+      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
     ],
   });
 
@@ -133,7 +131,7 @@ async function generateWithOpenAI(
     max_tokens: 5000,
     messages: [
       { role: "system", content: getSystemPrompt(locale) },
-      { role: "user", content: buildUserPrompt(profile, cardStats, rarity, creature) },
+      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
       { role: "assistant", content: text },
       {
         role: "user",
@@ -154,16 +152,15 @@ export async function generatePortrait(
   cardStats: CardStats,
   rarity: Rarity,
   locale: string,
-  creature: string,
   provider?: LLMProvider,
 ): Promise<CardPortrait> {
   const config = resolveConfig(provider);
 
   switch (config.provider) {
     case "anthropic":
-      return generateWithAnthropic(profile, cardStats, rarity, locale, creature, config.model!);
+      return generateWithAnthropic(profile, cardStats, rarity, locale, config.model!);
     case "openai":
-      return generateWithOpenAI(profile, cardStats, rarity, locale, creature, config.model!);
+      return generateWithOpenAI(profile, cardStats, rarity, locale, config.model!);
     default:
       throw new Error(`Unknown LLM provider: ${config.provider}`);
   }

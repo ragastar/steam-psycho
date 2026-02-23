@@ -161,8 +161,8 @@ export async function POST(req: Request) {
     // 8. Select card identity (creature + element) algorithmically
     const cardIdentity = selectCardIdentity(profile, cardStats, steamId64);
 
-    // 9. Generate portrait via LLM (with creature constraint for spirit_animal consistency)
-    const portrait = await generatePortrait(profile, cardStats, rarity, locale, cardIdentity.creature, provider);
+    // 9. Generate portrait via LLM (creature chosen freely by LLM, element stays algorithmic)
+    const portrait = await generatePortrait(profile, cardStats, rarity, locale, provider);
 
     // 10. Cache results
     await Promise.all([
