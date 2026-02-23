@@ -35,32 +35,10 @@ export function ShareButtons({ steamId64, archetype, rarity, emoji, locale }: Sh
     }
   };
 
-  const handleDownloadPng = async () => {
-    try {
-      const res = await fetch(`/api/og/${steamId64}`);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `gamertype-${steamId64}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      // ignore
-    }
-  };
-
   const shareTelegram = () => {
     const text = encodeURIComponent(shareText);
     const url = encodeURIComponent(resultUrl);
     window.open(`https://t.me/share/url?url=${url}&text=${text}`, "_blank");
-  };
-
-  const shareTwitter = () => {
-    const text = encodeURIComponent(shareText);
-    const url = encodeURIComponent(resultUrl);
-    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
   };
 
   const shareVk = () => {
@@ -79,12 +57,6 @@ export function ShareButtons({ steamId64, archetype, rarity, emoji, locale }: Sh
       </button>
       {/* Secondary buttons */}
       <button
-        onClick={shareTwitter}
-        className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-      >
-        {t("shareTwitter")}
-      </button>
-      <button
         onClick={shareVk}
         className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors text-sm"
       >
@@ -95,12 +67,6 @@ export function ShareButtons({ steamId64, archetype, rarity, emoji, locale }: Sh
         className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors text-sm"
       >
         {copied ? t("linkCopied") : t("copyLink")}
-      </button>
-      <button
-        onClick={handleDownloadPng}
-        className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors text-sm"
-      >
-        {t("downloadPng")}
       </button>
     </div>
   );
