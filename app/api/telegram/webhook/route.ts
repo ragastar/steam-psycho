@@ -1,5 +1,5 @@
 import { registerHandlers } from "@/lib/telegram/handlers";
-import { getBot, ensureWebhook } from "@/lib/telegram/bot";
+import { getBot, ensureBotInit, ensureWebhook } from "@/lib/telegram/bot";
 
 registerHandlers();
 
@@ -23,12 +23,12 @@ export async function POST(req: Request) {
     return new Response("Bad Request", { status: 400 });
   }
 
-  // 3. Process in background — don't await
+  // 3. Init bot (once) and process in background
   const bot = getBot();
   if (bot) {
-    bot.handleUpdate(update).catch((err) =>
-      console.error("[webhook] handleUpdate error:", err),
-    );
+    ensureBotInit()
+      .then(() => bot.handleUpdate(update))
+      .catch((err) => console.error("[webhook] handleUpdate error:", err));
   }
 
   // 4. Return 200 immediately so Telegram doesn't retry

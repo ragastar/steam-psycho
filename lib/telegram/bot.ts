@@ -1,6 +1,7 @@
 import { Bot } from "grammy";
 
 let bot: Bot | null = null;
+let botInitPromise: Promise<void> | null = null;
 let webhookChecked = false;
 
 export function getBot(): Bot | null {
@@ -11,6 +12,16 @@ export function getBot(): Bot | null {
     client: { timeoutSeconds: 10 },
   });
   return bot;
+}
+
+/** Ensure bot.init() has been called (fetches botInfo from Telegram API once) */
+export async function ensureBotInit(): Promise<void> {
+  const b = getBot();
+  if (!b) return;
+  if (!botInitPromise) {
+    botInitPromise = b.init();
+  }
+  await botInitPromise;
 }
 
 export async function ensureWebhook(): Promise<void> {
