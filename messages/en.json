@@ -11,7 +11,12 @@
     "submitButton": "Analyze Me",
     "aiModel": "AI Model",
     "poweredBy": "Powered by {model}",
-    "disclaimer": "Entertainment content, not a real psychoanalysis"
+    "disclaimer": "Entertainment content, not a real psychoanalysis",
+    "helpToggle": "Where to find your Steam ID?",
+    "helpStep1": "Open Steam → your profile",
+    "helpStep2": "Copy the URL from the address bar",
+    "helpStep3": "Paste it here — profile URL, vanity URL or SteamID64 all work",
+    "helpExample": "Example: steamcommunity.com/id/gaben"
   },
   "loading": {
     "step1": "Finding profile...",

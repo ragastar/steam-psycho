@@ -11,7 +11,12 @@
     "submitButton": "Узнать себя",
     "aiModel": "AI-модель",
     "poweredBy": "Работает на {model}",
-    "disclaimer": "Развлекательный контент, не настоящий психоанализ"
+    "disclaimer": "Развлекательный контент, не настоящий психоанализ",
+    "helpToggle": "Где найти свой Steam ID?",
+    "helpStep1": "Откройте Steam → ваш профиль",
+    "helpStep2": "Скопируйте URL из адресной строки",
+    "helpStep3": "Вставьте сюда — подойдёт ссылка, vanity URL или SteamID64",
+    "helpExample": "Например: steamcommunity.com/id/gaben"
   },
   "loading": {
     "step1": "Ищем профиль...",

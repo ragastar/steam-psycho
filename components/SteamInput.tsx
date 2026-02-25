@@ -18,6 +18,7 @@ export function SteamInput() {
   const locale = useLocale();
   const router = useRouter();
   const [input, setInput] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
   const [errorCode, setErrorCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -98,6 +99,24 @@ export function SteamInput() {
         >
           {t("landing.submitButton")}
         </button>
+      </div>
+
+      <div className="text-center">
+        <button
+          type="button"
+          onClick={() => setShowHelp(!showHelp)}
+          className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
+        >
+          {t("landing.helpToggle")}
+        </button>
+        {showHelp && (
+          <div className="mt-2 text-xs text-gray-500 space-y-1 text-left bg-gray-900/50 border border-gray-700/30 rounded-lg px-4 py-3">
+            <p>1. {t("landing.helpStep1")}</p>
+            <p>2. {t("landing.helpStep2")}</p>
+            <p>3. {t("landing.helpStep3")}</p>
+            <p className="pt-1 font-mono text-gray-400">{t("landing.helpExample")}</p>
+          </div>
+        )}
       </div>
 
       {providers.length > 1 && (
