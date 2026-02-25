@@ -17,9 +17,7 @@ const MAX_CONSECUTIVE_ERRORS = 3;
 export function TelegramGate({ steamId64, locale, children }: TelegramGateProps) {
   const t = useTranslations("gate");
   const gateDisabled = process.env.NEXT_PUBLIC_DISABLE_GATE === "true";
-  // Auto-unlock for shared links (?u=1) so friends see full card
-  const isSharedLink = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("u") === "1";
-  const [unlocked, setUnlocked] = useState(gateDisabled || isSharedLink);
+  const [unlocked, setUnlocked] = useState(gateDisabled);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);

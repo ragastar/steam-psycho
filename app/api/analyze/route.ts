@@ -14,7 +14,7 @@ import { enrichGames } from "@/lib/steam/enrich";
 import { buildAggregatedProfile, calculateCardStats, calculateRarity } from "@/lib/aggregation/aggregate";
 import { generatePortrait, type LLMProvider } from "@/lib/llm/client";
 import { SteamApiError } from "@/lib/steam/types";
-import type { AchievementGameData } from "@/lib/steam/types";
+import type { AchievementGameData, OwnedGame } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { CACHE_TTL, portraitKey, profileKey, rateLimitKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
@@ -104,11 +104,12 @@ export async function POST(req: Request) {
     }
 
     // 3. Fetch player data (parallel)
+    // Critical calls (player, games) throw on failure; non-critical ones gracefully degrade
     const [player, games, recentGames, level, friends, badgesResponse] = await Promise.all([
       getPlayerSummary(steamId64),
       getOwnedGames(steamId64),
-      getRecentlyPlayedGames(steamId64),
-      getSteamLevel(steamId64),
+      getRecentlyPlayedGames(steamId64).catch(() => [] as OwnedGame[]),
+      getSteamLevel(steamId64).catch(() => 0),
       getFriendList(steamId64),
       getBadges(steamId64),
     ]);

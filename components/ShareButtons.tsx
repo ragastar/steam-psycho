@@ -17,8 +17,7 @@ export function ShareButtons({ steamId64, archetype, rarity, emoji, locale }: Sh
   const [copied, setCopied] = useState(false);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://gamertype.fun";
-  // Share link with ?u=1 so friends see the full card without gate
-  const resultUrl = `${baseUrl}/${locale}/result/${steamId64}?u=1`;
+  const resultUrl = `${baseUrl}/${locale}/result/${steamId64}`;
   const shareText = t(locale === "ru" ? "shareTextRu" : "shareTextEn", {
     emoji,
     archetype,
