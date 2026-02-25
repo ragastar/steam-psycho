@@ -82,8 +82,19 @@ export function registerHandlers() {
         await ctx.reply(msg.notSubscribed);
       }
     } catch (err) {
-      console.error("[gate] Subscription check failed:", channelId, err);
-      await ctx.reply(msg.error);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error("[gate] Subscription check failed:", channelId, "user:", ctx.from?.id, "error:", errMsg);
+
+      // Bot is likely not an admin of the channel — unlock gracefully and log
+      if (errMsg.includes("bot is not a member") || errMsg.includes("chat not found") || errMsg.includes("CHAT_ADMIN_REQUIRED") || errMsg.includes("member list is inaccessible")) {
+        console.error("[gate] CRITICAL: Bot cannot check channel membership. Add bot as admin to", channelId);
+        // Graceful unlock: don't punish user for our misconfiguration
+        await setCache(gateTokenKey(token), { ...data, status: "unlocked" }, CACHE_TTL.gate);
+        logGateEvent({ steamId64: data.steamId64, event: "unlocked" });
+        await ctx.reply(msg.unlocked);
+      } else {
+        await ctx.reply(msg.error);
+      }
     }
   });
 }

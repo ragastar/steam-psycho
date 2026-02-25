@@ -66,35 +66,40 @@ export async function enrichGames(
   const sorted = [...games].sort((a, b) => b.playtime_forever - a.playtime_forever);
   const topGames = sorted.slice(0, topN);
 
+  // Process top games in parallel batches of 5 (instead of sequential)
+  const BATCH_SIZE = 5;
   const enriched: EnrichedGame[] = [];
 
-  for (const game of topGames) {
-    // Single SteamSpy request for tags + price + avg playtime
-    const [spyData, storeData] = await Promise.all([
-      fetchSteamSpyAppData(game.appid),
-      fetchStoreData(game.appid),
-    ]);
+  for (let i = 0; i < topGames.length; i += BATCH_SIZE) {
+    const batch = topGames.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (game) => {
+        const [spyData, storeData] = await Promise.all([
+          fetchSteamSpyAppData(game.appid),
+          fetchStoreData(game.appid),
+        ]);
+        const tags = spyData?.tags || {};
+        const price = storeData.price ?? parseSteamSpyPrice(spyData);
+        const isFree = storeData.isFree || (spyData?.initialprice === "0" && !price);
+        return {
+          ...game,
+          tags,
+          genres: storeData.genres,
+          price,
+          isFree,
+          averageForever: spyData?.average_forever,
+        } as EnrichedGame;
+      }),
+    );
+    enriched.push(...batchResults);
 
-    const tags = spyData?.tags || {};
-    // Store price preferred, SteamSpy initialprice as fallback
-    const price = storeData.price ?? parseSteamSpyPrice(spyData);
-    const isFree = storeData.isFree || (spyData?.initialprice === "0" && !price);
-
-    enriched.push({
-      ...game,
-      tags,
-      genres: storeData.genres,
-      price,
-      isFree,
-      averageForever: spyData?.average_forever,
-    });
-
-    await delay(DELAY_MS);
+    if (i + BATCH_SIZE < topGames.length) {
+      await delay(DELAY_MS);
+    }
   }
 
   // Remaining games: fetch only SteamSpy for price (no Store API — saves time)
   const remaining = sorted.slice(topN);
-  const BATCH_SIZE = 5;
   for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
     const batch = remaining.slice(i, i + BATCH_SIZE);
     const spyResults = await Promise.all(
