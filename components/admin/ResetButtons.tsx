@@ -11,48 +11,22 @@ export default function ResetButtons() {
     return pwd || "";
   }
 
-  async function resetAnalytics() {
-    if (!confirm("Удалить ВСЮ статистику (analyses, errors, art_generations, gate_events)?")) return;
+  async function callApi(url: string, confirmMsg: string, loadingKey: string, successMsg: string) {
+    if (!confirm(confirmMsg)) return;
     const token = await getToken();
     if (!token) return;
 
-    setLoading("analytics");
+    setLoading(loadingKey);
     setResult(null);
     try {
-      const res = await fetch("/api/admin/analytics/reset", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
       const data = await res.json();
       if (res.ok) {
-        setResult({ type: "ok", msg: "Статистика сброшена" });
-      } else {
-        setResult({ type: "err", msg: data.error || "Ошибка" });
-      }
-    } catch (e) {
-      setResult({ type: "err", msg: String(e) });
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  async function flushCache() {
-    if (!confirm("Очистить ВСЕ кешированные профили (Redis + memory)?")) return;
-    const token = await getToken();
-    if (!token) return;
-
-    setLoading("cache");
-    setResult(null);
-    try {
-      const res = await fetch("/api/admin/cache/flush", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setResult({ type: "ok", msg: "Кеш очищен" });
+        setResult({ type: "ok", msg: data.message || successMsg });
       } else {
         setResult({ type: "err", msg: data.error || "Ошибка" });
       }
@@ -67,14 +41,36 @@ export default function ResetButtons() {
     <div className="space-y-3">
       <div className="flex gap-3 flex-wrap">
         <button
-          onClick={flushCache}
+          onClick={() => callApi(
+            "/api/admin/cache/flush",
+            "Сбросить кеш профилей? При следующем запросе профили будут сгенерены заново.",
+            "cache",
+            "Кеш очищен",
+          )}
           disabled={loading !== null}
           className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
         >
           {loading === "cache" ? "Очищаем..." : "Сбросить профили (кеш)"}
         </button>
         <button
-          onClick={resetAnalytics}
+          onClick={() => callApi(
+            "/api/admin/art/clear",
+            "Удалить ВСЕ сгенерированные картинки? Они перегенерятся при следующем запросе.",
+            "art",
+            "Картинки удалены",
+          )}
+          disabled={loading !== null}
+          className="px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          {loading === "art" ? "Удаляем..." : "Удалить арт-картинки"}
+        </button>
+        <button
+          onClick={() => callApi(
+            "/api/admin/analytics/reset",
+            "Удалить ВСЮ статистику (analyses, errors, art_generations, gate_events)?",
+            "analytics",
+            "Статистика сброшена",
+          )}
           disabled={loading !== null}
           className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
         >
