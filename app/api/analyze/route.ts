@@ -12,11 +12,10 @@ import {
 } from "@/lib/steam/client";
 import { enrichGames } from "@/lib/steam/enrich";
 import { buildAggregatedProfile, calculateCardStats, calculateRarity } from "@/lib/aggregation/aggregate";
-import { generatePortrait, type LLMProvider } from "@/lib/llm/client";
 import { SteamApiError } from "@/lib/steam/types";
 import type { AchievementGameData, OwnedGame } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
-import { CACHE_TTL, portraitKey, profileKey, rateLimitKey } from "@/lib/cache/keys";
+import { CACHE_TTL, portraitKey, profileKey, rateLimitKey, cardStatsKey, rarityKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
@@ -78,10 +77,9 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { input, locale = "ru", provider } = body as {
+    const { input, locale = "ru" } = body as {
       input: string;
       locale?: string;
-      provider?: LLMProvider;
     };
 
     if (!input || typeof input !== "string") {
@@ -96,13 +94,19 @@ export async function POST(req: Request) {
     const steamId64 = await resolveToSteamId64(input);
     console.log(`[analyze] ${steamId64} resolve: ${Date.now() - t0}ms`);
 
-    // 2. Check cache for existing portrait
+    // 2. Check cache — if portrait or profile already exists, skip
     const ipHash = hashIp(ip);
 
     const cachedPortrait = await getCache(portraitKey(steamId64, locale));
     if (cachedPortrait) {
       logAnalysis({ steamId64, locale, cached: true, ipHash });
-      console.log(`[analyze] ${steamId64} HIT cache, total: ${Date.now() - t0}ms`);
+      console.log(`[analyze] ${steamId64} HIT portrait cache, total: ${Date.now() - t0}ms`);
+      return NextResponse.json({ steamId64, cached: true });
+    }
+
+    const cachedProfile = await getCache(profileKey(steamId64));
+    if (cachedProfile) {
+      console.log(`[analyze] ${steamId64} HIT profile cache (no portrait yet), total: ${Date.now() - t0}ms`);
       return NextResponse.json({ steamId64, cached: true });
     }
 
@@ -176,15 +180,11 @@ export async function POST(req: Request) {
     // 8. Select card identity (creature + element) algorithmically
     const cardIdentity = selectCardIdentity(profile, cardStats, steamId64);
 
-    // 9. Generate portrait via LLM (creature chosen freely by LLM, element stays algorithmic)
-    const t4 = Date.now();
-    const portrait = await generatePortrait(profile, cardStats, rarity, locale, provider);
-    console.log(`[analyze] ${steamId64} LLM: ${Date.now() - t4}ms`);
-
-    // 10. Cache results
+    // 9. Cache profile data (LLM generation deferred to /api/generate after Telegram subscription)
     await Promise.all([
-      setCache(portraitKey(steamId64, locale), portrait, CACHE_TTL.portrait),
       setCache(profileKey(steamId64), profile, CACHE_TTL.aggregatedProfile),
+      setCache(cardStatsKey(steamId64), cardStats, CACHE_TTL.aggregatedProfile),
+      setCache(rarityKey(steamId64), rarity, CACHE_TTL.aggregatedProfile),
       setCache(`art:identity:${steamId64}`, cardIdentity, CACHE_TTL.portrait),
     ]);
 
@@ -194,13 +194,10 @@ export async function POST(req: Request) {
       steamId64, locale, cached: false, ipHash,
       rarity,
       stats: cardStats,
-      primaryArchetype: portrait.primaryArchetype?.name,
-      spiritAnimal: portrait.spirit_animal?.name,
       element: cardIdentity.element,
       librarySize: games.length,
       totalPlaytimeHours: games.reduce((s, g) => s + g.playtime_forever, 0) / 60,
       accountAgeYears: profile.timeline?.accountAge,
-      llmProvider: provider || process.env.LLM_PROVIDER || "openai",
     });
 
     return NextResponse.json({ steamId64, cached: false });

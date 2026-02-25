@@ -1,13 +1,15 @@
 import { getCache, setCache } from "@/lib/cache/redis";
-import { portraitKey, profileKey, CACHE_TTL } from "@/lib/cache/keys";
-import type { CardPortrait } from "@/lib/llm/types";
+import { portraitKey, profileKey, cardStatsKey, rarityKey, CACHE_TTL } from "@/lib/cache/keys";
+import type { CardPortrait, Rarity } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
+import type { CardStats } from "@/lib/aggregation/aggregate";
 import { translatePortrait } from "@/lib/llm/translate";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { ShareButtons } from "@/components/ShareButtons";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ResultTabs } from "@/components/ResultTabs";
+import { TeaserPage } from "@/components/TeaserPage";
 
 interface Props {
   params: { id: string; locale: string };
@@ -47,8 +49,27 @@ export default async function ResultPage({ params }: Props) {
   let portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
 
-  // Fallback: translate from other locale instead of showing "expired"
+  // Teaser: profile exists but no portrait yet (pre-subscription state)
   if (!portrait && profile) {
+    const cachedStats = await getCache<CardStats>(cardStatsKey(params.id));
+    const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
+    if (cachedStats && cachedRarity) {
+      return (
+        <div className="min-h-screen">
+          <div className="absolute top-4 right-4 z-30">
+            <LocaleSwitcher />
+          </div>
+          <TeaserPage
+            profile={profile}
+            steamId64={params.id}
+            locale={params.locale}
+            rarity={cachedRarity}
+          />
+        </div>
+      );
+    }
+
+    // Fallback: translate from other locale instead of showing "expired"
     const otherLocale = params.locale === "ru" ? "en" : "ru";
     const otherPortrait = await getCache<CardPortrait>(portraitKey(params.id, otherLocale));
     if (otherPortrait) {

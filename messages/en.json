@@ -291,6 +291,21 @@
     },
     "retry": "Retry"
   },
+  "teaser": {
+    "title": "Your Card is Almost Ready!",
+    "subtitle": "We dug through your Steam library and found some wild stuff...",
+    "whatAwaits": "Here's what's waiting for you:",
+    "feature1": "Your 3 archetypes — who are you in the gaming world?",
+    "feature2": "Big Five psycho profile — the truth about you",
+    "feature3": "6 roasts that will hit where it hurts",
+    "feature4": "AI art — your gaming spirit visualized",
+    "feature5": "Analytics that'll blow your mind",
+    "generating": "Generating your AI portrait...",
+    "generatingHint": "Usually 10-15 seconds, hang tight",
+    "games": "games",
+    "hours": "hours",
+    "level": "level"
+  },
   "gate": {
     "title": "Unlock Your Full Card",
     "description": "Subscribe to our Telegram channel to see your complete card",

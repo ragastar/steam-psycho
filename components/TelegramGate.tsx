@@ -7,14 +7,15 @@ import { motion, AnimatePresence } from "framer-motion";
 interface TelegramGateProps {
   steamId64: string;
   locale: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  onUnlock?: () => void;
 }
 
 const LS_PREFIX = "gate:";
 const POLL_INTERVAL = 3000;
 const MAX_CONSECUTIVE_ERRORS = 3;
 
-export function TelegramGate({ steamId64, locale, children }: TelegramGateProps) {
+export function TelegramGate({ steamId64, locale, children, onUnlock }: TelegramGateProps) {
   const t = useTranslations("gate");
   const gateDisabled = process.env.NEXT_PUBLIC_DISABLE_GATE === "true";
   const [unlocked, setUnlocked] = useState(gateDisabled);
@@ -61,6 +62,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
         errorCountRef.current += 1;
         if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
           setUnlocked(true);
+          onUnlock?.();
         }
         return;
       }
@@ -68,6 +70,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
       const data = await res.json();
       if (data.status === "unlocked") {
         setUnlocked(true);
+        onUnlock?.();
         localStorage.setItem(lsKey, JSON.stringify({ token: tk, unlocked: true }));
       } else if (data.status === "expired") {
         // Token expired — auto-recreate and update bot link
@@ -80,9 +83,10 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
       errorCountRef.current += 1;
       if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
         setUnlocked(true);
+        onUnlock?.();
       }
     }
-  }, [lsKey, createToken]);
+  }, [lsKey, createToken, onUnlock]);
 
   // Init: check localStorage or create token
   useEffect(() => {
@@ -93,6 +97,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
           const parsed = JSON.parse(stored);
           if (parsed.unlocked) {
             setUnlocked(true);
+            onUnlock?.();
             setLoading(false);
             return;
           }
@@ -110,7 +115,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
       setLoading(false);
     }
     init();
-  }, [lsKey, checkStatus, createToken]);
+  }, [lsKey, checkStatus, createToken, onUnlock]);
 
   // Polling
   useEffect(() => {
@@ -136,6 +141,29 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
   if (loading) return null;
 
   const botUrl = token ? `https://t.me/gamertype_bot?start=${token}` : "https://t.me/gamertype_bot";
+
+  // Standalone mode (no children) — just render the CTA card
+  if (!children) {
+    if (unlocked) return null;
+    return (
+      <div className="bg-gray-900/95 backdrop-blur-sm rounded-2xl p-6 max-w-sm mx-auto text-center space-y-3 border border-purple-500/30 shadow-lg shadow-purple-500/10">
+        <div className="text-3xl">🔒</div>
+        <h3 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+          {t("title")}
+        </h3>
+        <p className="text-gray-400 text-sm">{t("description")}</p>
+        <a
+          href={botUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-500 hover:to-pink-500 transition-all shadow-lg shadow-purple-500/20"
+        >
+          {t("button")}
+        </a>
+        <p className="text-gray-600 text-xs">{t("hint")}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">

@@ -26,6 +26,14 @@ export function gateTokenKey(token: string): string {
   return `gate:${token}`;
 }
 
+export function cardStatsKey(steamId64: string): string {
+  return `cardstats:v1:${steamId64}`;
+}
+
+export function rarityKey(steamId64: string): string {
+  return `rarity:v1:${steamId64}`;
+}
+
 export function artImageKey(steamId64: string): string {
   return `art:image:v1:${steamId64}`;
 }
