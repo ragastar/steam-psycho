@@ -2,6 +2,7 @@ import { getRecentErrors, getDbSize, getTableCounts } from "@/lib/analytics/quer
 import StatCard from "@/components/admin/StatCard";
 import ChartCard from "@/components/admin/ChartCard";
 import DataTable from "@/components/admin/DataTable";
+import ResetButtons from "@/components/admin/ResetButtons";
 import fs from "fs";
 import path from "path";
 
@@ -60,6 +61,10 @@ export default function SystemPage() {
         <StatCard label="art_generations" value={tables.art_generations} />
         <StatCard label="gate_events" value={tables.gate_events} />
       </div>
+
+      <ChartCard title="Управление данными">
+        <ResetButtons />
+      </ChartCard>
 
       <ChartCard title="Последние 50 ошибок">
         <DataTable
