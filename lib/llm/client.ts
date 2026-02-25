@@ -55,7 +55,10 @@ async function generateWithAnthropic(
   locale: string,
   model: string,
 ): Promise<CardPortrait> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    timeout: 45_000,
+  });
 
   const response = await client.messages.create({
     model,
@@ -73,24 +76,29 @@ async function generateWithAnthropic(
   const parsed = CardPortraitSchema.safeParse(json);
   if (parsed.success) return parsed.data;
 
-  // Retry
-  const retry = await client.messages.create({
-    model,
-    max_tokens: 5000,
-    system: getSystemPrompt(locale),
-    messages: [
-      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
-      { role: "assistant", content: textBlock.text },
-      {
-        role: "user",
-        content: `The JSON was invalid. Errors: ${parsed.error.issues.map((e) => e.message).join(", ")}. Fix and return ONLY valid JSON.`,
-      },
-    ],
-  });
+  // Retry — wrap in try/catch to avoid doubling timeout
+  try {
+    const retry = await client.messages.create({
+      model,
+      max_tokens: 5000,
+      system: getSystemPrompt(locale),
+      messages: [
+        { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
+        { role: "assistant", content: textBlock.text },
+        {
+          role: "user",
+          content: `The JSON was invalid. Errors: ${parsed.error.issues.map((e) => e.message).join(", ")}. Fix and return ONLY valid JSON.`,
+        },
+      ],
+    });
 
-  const retryText = retry.content.find((b) => b.type === "text");
-  if (!retryText || retryText.type !== "text") throw new Error("No text in retry");
-  return CardPortraitSchema.parse(extractJSON(retryText.text));
+    const retryText = retry.content.find((b) => b.type === "text");
+    if (!retryText || retryText.type !== "text") throw new Error("No text in retry");
+    return CardPortraitSchema.parse(extractJSON(retryText.text));
+  } catch (retryErr) {
+    console.error("[llm] Anthropic retry failed:", retryErr instanceof Error ? retryErr.message : retryErr);
+    throw new Error("LLM retry failed: " + (retryErr instanceof Error ? retryErr.message : "unknown"));
+  }
 }
 
 // --- OpenAI ---
@@ -105,6 +113,7 @@ async function generateWithOpenAI(
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: "https://openrouter.ai/api/v1",
+    timeout: 45_000,
   });
 
   const response = await client.chat.completions.create({
@@ -125,24 +134,29 @@ async function generateWithOpenAI(
 
   console.warn(`[llm] OpenAI parse failed:`, (parsed as { error: { issues: { path: string[]; message: string }[] } }).error.issues.map((e) => `${e.path.join(".")}: ${e.message}`));
 
-  // Retry
-  const retry = await client.chat.completions.create({
-    model,
-    max_tokens: 5000,
-    messages: [
-      { role: "system", content: getSystemPrompt(locale) },
-      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
-      { role: "assistant", content: text },
-      {
-        role: "user",
-        content: `The JSON was invalid. Errors: ${parsed.error.issues.map((e) => e.message).join(", ")}. Fix and return ONLY valid JSON.`,
-      },
-    ],
-  });
+  // Retry — wrap in try/catch to avoid doubling timeout
+  try {
+    const retry = await client.chat.completions.create({
+      model,
+      max_tokens: 5000,
+      messages: [
+        { role: "system", content: getSystemPrompt(locale) },
+        { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
+        { role: "assistant", content: text },
+        {
+          role: "user",
+          content: `The JSON was invalid. Errors: ${parsed.error.issues.map((e) => e.message).join(", ")}. Fix and return ONLY valid JSON.`,
+        },
+      ],
+    });
 
-  const retryText = retry.choices[0]?.message?.content;
-  if (!retryText) throw new Error("No text in retry");
-  return CardPortraitSchema.parse(extractJSON(retryText));
+    const retryText = retry.choices[0]?.message?.content;
+    if (!retryText) throw new Error("No text in retry");
+    return CardPortraitSchema.parse(extractJSON(retryText));
+  } catch (retryErr) {
+    console.error("[llm] OpenAI retry failed:", retryErr instanceof Error ? retryErr.message : retryErr);
+    throw new Error("LLM retry failed: " + (retryErr instanceof Error ? retryErr.message : "unknown"));
+  }
 }
 
 // --- Public API ---

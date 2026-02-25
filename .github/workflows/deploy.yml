@@ -22,3 +22,16 @@ jobs:
             cd /opt/steam-psycho
             git pull origin master
             docker compose up -d --build
+
+            echo "Waiting for health check..."
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:3001/api/health > /dev/null 2>&1; then
+                echo "Health check passed on attempt $i"
+                exit 0
+              fi
+              echo "Attempt $i/30 — waiting..."
+              sleep 2
+            done
+            echo "Health check failed after 30 attempts"
+            docker compose logs --tail=50
+            exit 1

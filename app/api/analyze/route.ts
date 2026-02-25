@@ -92,7 +92,9 @@ export async function POST(req: Request) {
     }
 
     // 1. Resolve SteamID64
+    const t0 = Date.now();
     const steamId64 = await resolveToSteamId64(input);
+    console.log(`[analyze] ${steamId64} resolve: ${Date.now() - t0}ms`);
 
     // 2. Check cache for existing portrait
     const ipHash = hashIp(ip);
@@ -100,11 +102,13 @@ export async function POST(req: Request) {
     const cachedPortrait = await getCache(portraitKey(steamId64, locale));
     if (cachedPortrait) {
       logAnalysis({ steamId64, locale, cached: true, ipHash });
+      console.log(`[analyze] ${steamId64} HIT cache, total: ${Date.now() - t0}ms`);
       return NextResponse.json({ steamId64, cached: true });
     }
 
     // 3. Fetch player data (parallel)
     // Critical calls (player, games) throw on failure; non-critical ones gracefully degrade
+    const t1 = Date.now();
     const [player, games, recentGames, level, friends, badgesResponse] = await Promise.all([
       getPlayerSummary(steamId64),
       getOwnedGames(steamId64),
@@ -113,6 +117,7 @@ export async function POST(req: Request) {
       getFriendList(steamId64),
       getBadges(steamId64),
     ]);
+    console.log(`[analyze] ${steamId64} steam API: ${Date.now() - t1}ms`);
 
     // 3.5 Check for hidden library
     if (!games || games.length === 0) {
@@ -140,14 +145,18 @@ export async function POST(req: Request) {
     }
 
     // 4. Enrich with tags + prices
+    const t2 = Date.now();
     const enrichedGames = await enrichGames(games);
+    console.log(`[analyze] ${steamId64} enrich: ${Date.now() - t2}ms`);
 
     // 5. Fetch achievements for top games
+    const t3 = Date.now();
     const sortedGames = [...enrichedGames].sort((a, b) => b.playtime_forever - a.playtime_forever);
     const achievementsData = await fetchAchievementsForTopGames(
       steamId64,
       sortedGames.slice(0, 10).map((g) => ({ appid: g.appid, name: g.name })),
     );
+    console.log(`[analyze] ${steamId64} achievements: ${Date.now() - t3}ms`);
 
     // 6. Aggregate profile
     const profile = buildAggregatedProfile(
@@ -168,7 +177,9 @@ export async function POST(req: Request) {
     const cardIdentity = selectCardIdentity(profile, cardStats, steamId64);
 
     // 9. Generate portrait via LLM (creature chosen freely by LLM, element stays algorithmic)
+    const t4 = Date.now();
     const portrait = await generatePortrait(profile, cardStats, rarity, locale, provider);
+    console.log(`[analyze] ${steamId64} LLM: ${Date.now() - t4}ms`);
 
     // 10. Cache results
     await Promise.all([
@@ -176,6 +187,8 @@ export async function POST(req: Request) {
       setCache(profileKey(steamId64), profile, CACHE_TTL.aggregatedProfile),
       setCache(`art:identity:${steamId64}`, cardIdentity, CACHE_TTL.portrait),
     ]);
+
+    console.log(`[analyze] ${steamId64} TOTAL: ${Date.now() - t0}ms`);
 
     logAnalysis({
       steamId64, locale, cached: false, ipHash,

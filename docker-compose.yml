@@ -5,6 +5,9 @@ services:
     env_file: .env.local
     ports:
       - "3001:3000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - art-data:/data/art
       - db-data:/data/db

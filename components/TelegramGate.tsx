@@ -25,6 +25,34 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
 
   const lsKey = `${LS_PREFIX}${steamId64}`;
 
+  const createToken = useCallback(async (retries = 2): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/gate/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steamId64, locale }),
+      });
+      if (!res.ok) {
+        if (retries > 0) {
+          await new Promise((r) => setTimeout(r, 2000));
+          return createToken(retries - 1);
+        }
+        return null;
+      }
+      const data = await res.json();
+      const tk = data.token as string;
+      setToken(tk);
+      localStorage.setItem(lsKey, JSON.stringify({ token: tk, unlocked: false }));
+      return tk;
+    } catch {
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 2000));
+        return createToken(retries - 1);
+      }
+      return null;
+    }
+  }, [steamId64, locale, lsKey]);
+
   const checkStatus = useCallback(async (tk: string) => {
     try {
       const res = await fetch(`/api/gate/status?token=${tk}`);
@@ -42,9 +70,10 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
         setUnlocked(true);
         localStorage.setItem(lsKey, JSON.stringify({ token: tk, unlocked: true }));
       } else if (data.status === "expired") {
-        // Token expired, create new one
+        // Token expired — auto-recreate and update bot link
         localStorage.removeItem(lsKey);
         setToken(null);
+        createToken();
       }
     } catch {
       // Don't unlock on transient network errors (e.g. mobile screenshot suspension)
@@ -53,29 +82,7 @@ export function TelegramGate({ steamId64, locale, children }: TelegramGateProps)
         setUnlocked(true);
       }
     }
-  }, [lsKey]);
-
-  const createToken = useCallback(async () => {
-    try {
-      const res = await fetch("/api/gate/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ steamId64, locale }),
-      });
-      if (!res.ok) {
-        // Keep gate locked, just show without token — user can still click the bot link
-        return null;
-      }
-      const data = await res.json();
-      const tk = data.token as string;
-      setToken(tk);
-      localStorage.setItem(lsKey, JSON.stringify({ token: tk, unlocked: false }));
-      return tk;
-    } catch {
-      // Keep gate locked on network error — don't unlock on transient failures
-      return null;
-    }
-  }, [steamId64, locale, lsKey]);
+  }, [lsKey, createToken]);
 
   // Init: check localStorage or create token
   useEffect(() => {

@@ -49,6 +49,9 @@ export function SteamInput() {
     setLoading(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,7 +60,10 @@ export function SteamInput() {
           locale,
           provider: selectedProvider || undefined,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await res.json();
 
@@ -68,8 +74,12 @@ export function SteamInput() {
       }
 
       router.push(`/${locale}/result/${data.steamId64}`);
-    } catch {
-      setErrorCode("ANALYSIS_ERROR");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setErrorCode("TIMEOUT");
+      } else {
+        setErrorCode("ANALYSIS_ERROR");
+      }
       setLoading(false);
     }
   }, [input, locale, selectedProvider, router]);

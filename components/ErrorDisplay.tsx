@@ -18,6 +18,7 @@ const ERROR_CODE_MAP: Record<string, string> = {
   NO_PLAYTIME: "noPlaytime",
   STEAM_UNAVAILABLE: "steamUnavailable",
   ANALYSIS_ERROR: "analysisError",
+  TIMEOUT: "timeout",
   RATE_LIMITED: "rateLimited",
 };
 

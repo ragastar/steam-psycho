@@ -278,6 +278,11 @@
       "description": "Something went wrong while creating your card. Please try again.",
       "action": "Try again"
     },
+    "timeout": {
+      "title": "Request timed out",
+      "description": "The server took too long to respond. A retry is usually faster — the result may already be cached.",
+      "action": "Try again"
+    },
     "expired": "Analysis has expired. Click to re-analyze",
     "rateLimited": {
       "title": "Too many requests",

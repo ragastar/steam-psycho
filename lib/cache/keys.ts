@@ -6,7 +6,7 @@ export const CACHE_TTL = {
   portrait: 24 * 3600,          // 24 hours
   aggregatedProfile: 24 * 3600, // 24 hours
   rateLimit: 3600,              // 1 hour
-  gate: 3600,                   // 1 hour
+  gate: 24 * 3600,              // 24 hours
   artImage: 30 * 24 * 3600,    // 30 days
 } as const;
 
