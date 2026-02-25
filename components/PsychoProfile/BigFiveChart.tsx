@@ -33,8 +33,8 @@ const COLORS: Record<string, string> = {
 };
 
 export function BigFiveChart({ bigFive, labels, i18n }: BigFiveChartProps) {
-  // Pentagon SVG
-  const cx = 100, cy = 100, r = 70;
+  // Pentagon SVG — increased viewBox for labels
+  const cx = 150, cy = 140, r = 70;
   const angles = AXES.map((_, i) => (Math.PI * 2 * i) / 5 - Math.PI / 2);
 
   const gridLevels = [0.25, 0.5, 0.75, 1];
@@ -45,6 +45,25 @@ export function BigFiveChart({ bigFive, labels, i18n }: BigFiveChartProps) {
   const values = AXES.map((key) => bigFive[key] / 100);
   const dataPoints = angles.map((a, i) => `${cx + r * values[i] * Math.cos(a)},${cy + r * values[i] * Math.sin(a)}`).join(" ");
 
+  // Label positioning — push labels further out and adjust anchors per vertex
+  const labelConfigs = angles.map((a) => {
+    const labelR = r + 40;
+    const lx = cx + labelR * Math.cos(a);
+    const ly = cy + labelR * Math.sin(a);
+
+    // Text anchor based on position
+    let anchor: "start" | "middle" | "end" = "middle";
+    if (Math.cos(a) < -0.3) anchor = "end";
+    else if (Math.cos(a) > 0.3) anchor = "start";
+
+    // Vertical offset: top vertex needs less, bottom vertices need more
+    let dyOffset = 0;
+    if (Math.sin(a) < -0.3) dyOffset = -6; // top — shift up
+    if (Math.sin(a) > 0.3) dyOffset = 6;   // bottom — shift down
+
+    return { lx, ly: ly + dyOffset, anchor };
+  });
+
   return (
     <div className="bg-gray-900 rounded-2xl p-5">
       <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-1">{i18n.title}</h3>
@@ -52,10 +71,10 @@ export function BigFiveChart({ bigFive, labels, i18n }: BigFiveChartProps) {
 
       {/* SVG Pentagon */}
       <div className="flex justify-center mb-5">
-        <svg viewBox="0 0 200 200" className="w-56 h-56">
+        <svg viewBox="0 0 300 280" className="w-full max-w-sm h-auto">
           {/* Grid */}
-          {gridPolygons.map((points, i) => (
-            <polygon key={i} points={points} fill="none" stroke="rgba(107,114,128,0.2)" strokeWidth="0.5" />
+          {gridPolygons.map((points, idx) => (
+            <polygon key={idx} points={points} fill="none" stroke="rgba(107,114,128,0.2)" strokeWidth="0.5" />
           ))}
           {/* Axes */}
           {angles.map((a, i) => (
@@ -67,14 +86,25 @@ export function BigFiveChart({ bigFive, labels, i18n }: BigFiveChartProps) {
           {angles.map((a, i) => (
             <circle key={i} cx={cx + r * values[i] * Math.cos(a)} cy={cy + r * values[i] * Math.sin(a)} r="3" fill="#a855f7" />
           ))}
-          {/* Labels */}
+          {/* Labels: axis name + value + creative label */}
           {angles.map((a, i) => {
-            const lx = cx + (r + 18) * Math.cos(a);
-            const ly = cy + (r + 18) * Math.sin(a);
+            const { lx, ly, anchor } = labelConfigs[i];
+            const key = AXES[i];
             return (
-              <text key={i} x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" className="fill-gray-400 text-[7px]">
-                {bigFive[AXES[i]]}
-              </text>
+              <g key={i}>
+                {/* Axis name */}
+                <text x={lx} y={ly - 7} textAnchor={anchor} dominantBaseline="middle" className="fill-gray-300 text-[7px] font-semibold">
+                  {i18n[key]}
+                </text>
+                {/* Value */}
+                <text x={lx} y={ly + 2} textAnchor={anchor} dominantBaseline="middle" className="fill-purple-400 text-[8px] font-bold">
+                  {bigFive[key]}
+                </text>
+                {/* Creative label from LLM */}
+                <text x={lx} y={ly + 11} textAnchor={anchor} dominantBaseline="middle" className="fill-gray-500 text-[5.5px] italic">
+                  {labels[key]}
+                </text>
+              </g>
             );
           })}
         </svg>

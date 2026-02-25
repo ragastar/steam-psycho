@@ -20,7 +20,6 @@ interface LibraryOverviewCardProps {
 export function EconomicsCard({
   stats,
   multiplayerRatio,
-  singleplayerRatio,
   freePercentage,
   labels,
 }: LibraryOverviewCardProps) {
