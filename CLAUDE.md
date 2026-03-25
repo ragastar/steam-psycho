@@ -94,3 +94,11 @@ AI-психоанализ по библиотеке Steam. Генерирует 
 - Model controlled by env OPENROUTER_MODEL (user doesn't see/choose)
 - Current: openai/gpt-4o-mini
 - Integration: OpenAI SDK with baseURL: openrouter.ai/api/v1
+
+## Workflow
+- **Нет issue — нет работы.** Перед началом любой задачи создай issue на GitHub.
+- Доска: https://github.com/users/ragastar/projects/2
+- Новая задача → issue → добавь на доску → In Progress
+- Коммит с `#N` в сообщении
+- После завершения → комментарий в issue, карточку в Done, закрой issue
+- Язык: русский (коммиты, issues, комментарии)
