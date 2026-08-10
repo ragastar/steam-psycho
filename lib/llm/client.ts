@@ -5,6 +5,7 @@ import type { CardStats } from "../aggregation/aggregate";
 import { CardPortraitSchema } from "./types";
 import { getSystemPrompt, buildUserPrompt } from "./prompt";
 import { generateWithAnthropic as generatePortraitViaAnthropic } from "./providers/anthropic";
+import { extractJSON } from "./json";
 
 export type LLMProvider = "anthropic" | "openai";
 
@@ -52,20 +53,6 @@ export function resolveConfig(provider?: LLMProvider): LLMConfig {
       : process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODELS.anthropic;
 
   return { provider: resolved, model };
-}
-
-// --- JSON extraction ---
-
-function extractJSON(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (match) return JSON.parse(match[1].trim());
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    throw new Error("No valid JSON found in LLM response");
-  }
 }
 
 // --- Anthropic (Claude) ---
