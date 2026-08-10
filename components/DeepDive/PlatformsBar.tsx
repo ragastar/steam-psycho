@@ -2,14 +2,14 @@ import type { AggregatedProfile } from "@/lib/aggregation/types";
 
 interface PlatformsBarProps {
   platforms: AggregatedProfile["platforms"];
-  labels: { title: string; windows: string; linux: string; deck: string };
+  labels: { title: string; windows: string; linux: string; mac: string };
 }
 
 export function PlatformsBar({ platforms, labels }: PlatformsBarProps) {
   const segments = [
     { label: labels.windows, pct: platforms.windowsPercentage, color: "bg-blue-500" },
+    { label: labels.mac, pct: platforms.macPercentage, color: "bg-gray-400" },
     { label: labels.linux, pct: platforms.linuxPercentage, color: "bg-orange-500" },
-    { label: labels.deck, pct: platforms.deckPercentage, color: "bg-green-500" },
   ].filter((s) => s.pct > 0);
 
   return (

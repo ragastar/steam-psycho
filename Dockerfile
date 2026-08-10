@@ -12,7 +12,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN mkdir -p public
-ENV NEXT_PUBLIC_BASE_URL=https://gamertype.fun
+# Адрес сайта попадает в клиентский бандл на этапе сборки, поэтому это
+# build-arg, а не переменная окружения: менять домен через .env.local бесполезно.
+ARG NEXT_PUBLIC_BASE_URL=https://zadrotometr.ru
+ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
+# Имя бота тоже уходит в клиентский код на сборке.
+ARG NEXT_PUBLIC_TELEGRAM_BOT=gamertype_bot
+ENV NEXT_PUBLIC_TELEGRAM_BOT=$NEXT_PUBLIC_TELEGRAM_BOT
 RUN npm run build
 
 # Stage 3: Runner

@@ -13,7 +13,8 @@ interface TelegramGateProps {
 
 const LS_PREFIX = "gate:";
 const POLL_INTERVAL = 3000;
-const MAX_CONSECUTIVE_ERRORS = 3;
+// Имя бота больше не зашито в код: при смене бренда ссылка вела бы в никуда.
+const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT || "gamertype_bot";
 
 export function TelegramGate({ steamId64, locale, children, onUnlock }: TelegramGateProps) {
   const t = useTranslations("gate");
@@ -22,7 +23,6 @@ export function TelegramGate({ steamId64, locale, children, onUnlock }: Telegram
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const errorCountRef = useRef(0);
 
   const lsKey = `${LS_PREFIX}${steamId64}`;
 
@@ -54,21 +54,33 @@ export function TelegramGate({ steamId64, locale, children, onUnlock }: Telegram
     }
   }, [steamId64, locale, lsKey]);
 
+  /**
+   * Меняет открытый токен на подписанную куку. Без этого сервер не отдаст
+   * полный результат: решение о доступе принимает он, а не браузер.
+   */
+  const claimAccess = useCallback(async (tk: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/gate/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tk }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const checkStatus = useCallback(async (tk: string) => {
     try {
       const res = await fetch(`/api/gate/status?token=${tk}`);
-      if (!res.ok) {
-        // Don't unlock on transient errors — only after multiple consecutive failures
-        errorCountRef.current += 1;
-        if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
-          setUnlocked(true);
-          onUnlock?.();
-        }
-        return;
-      }
-      errorCountRef.current = 0; // Reset on success
+      if (!res.ok) return; // Ошибка — ждём дальше, а не открываем доступ.
+
       const data = await res.json();
       if (data.status === "unlocked") {
+        // Доступ открывается только после того, как сервер выдал куку.
+        // Раньше три подряд неудачных запроса просто открывали всё сами.
+        if (!(await claimAccess(tk))) return;
         setUnlocked(true);
         onUnlock?.();
         localStorage.setItem(lsKey, JSON.stringify({ token: tk, unlocked: true }));
@@ -79,14 +91,9 @@ export function TelegramGate({ steamId64, locale, children, onUnlock }: Telegram
         createToken();
       }
     } catch {
-      // Don't unlock on transient network errors (e.g. mobile screenshot suspension)
-      errorCountRef.current += 1;
-      if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
-        setUnlocked(true);
-        onUnlock?.();
-      }
+      // Сетевой сбой не должен раздавать платное — просто ждём следующей попытки.
     }
-  }, [lsKey, createToken, onUnlock]);
+  }, [lsKey, createToken, onUnlock, claimAccess]);
 
   // Init: check localStorage or create token
   useEffect(() => {
@@ -95,14 +102,10 @@ export function TelegramGate({ steamId64, locale, children, onUnlock }: Telegram
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          if (parsed.unlocked) {
-            setUnlocked(true);
-            onUnlock?.();
-            setLoading(false);
-            return;
-          }
           if (parsed.token) {
             setToken(parsed.token);
+            // Даже если в localStorage записано unlocked, идём к серверу:
+            // эту запись пользователь может выставить сам, а куку — нет.
             await checkStatus(parsed.token);
             setLoading(false);
             return;
@@ -115,7 +118,7 @@ export function TelegramGate({ steamId64, locale, children, onUnlock }: Telegram
       setLoading(false);
     }
     init();
-  }, [lsKey, checkStatus, createToken, onUnlock]);
+  }, [lsKey, checkStatus, createToken]);
 
   // Polling
   useEffect(() => {
@@ -140,7 +143,9 @@ export function TelegramGate({ steamId64, locale, children, onUnlock }: Telegram
 
   if (loading) return null;
 
-  const botUrl = token ? `https://t.me/gamertype_bot?start=${token}` : "https://t.me/gamertype_bot";
+  const botUrl = token
+    ? `https://t.me/${BOT_USERNAME}?start=${token}`
+    : `https://t.me/${BOT_USERNAME}`;
 
   // Standalone mode (no children) — just render the CTA card
   if (!children) {

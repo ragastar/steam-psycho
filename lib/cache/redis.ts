@@ -76,8 +76,18 @@ function sqliteSet(key: string, value: unknown, ttlSeconds: number): void {
   }
 }
 
-function isGateKey(key: string): boolean {
-  return key.startsWith("gate:");
+/**
+ * Что переживает перезапуск контейнера.
+ *
+ * Внешний кеш не настроен, поэтому всё живёт в памяти процесса. Раньше в SQLite
+ * писались только гейт-токены — и любой редеплой (а он идёт автоматически на
+ * каждый push в master) стирал разобранные профили: все, кто в этот момент ждал
+ * результат, получали «данные устарели, начните заново».
+ */
+const PERSISTENT_PREFIXES = ["gate:", "profile:", "cardstats:", "rarity:", "portrait:", "art:identity:"];
+
+function isPersistentKey(key: string): boolean {
+  return PERSISTENT_PREFIXES.some((p) => key.startsWith(p));
 }
 
 // --- Memory cache ---
@@ -161,7 +171,7 @@ export async function setCache<T>(key: string, value: T, ttlSeconds: number): Pr
   memSet(key, value, ttlSeconds);
 
   // Persist gate tokens to SQLite (survives container restarts)
-  if (isGateKey(key)) {
+  if (isPersistentKey(key)) {
     sqliteSet(key, value, ttlSeconds);
   }
 
@@ -180,7 +190,7 @@ export async function getCache<T>(key: string): Promise<T | null> {
   if (memResult !== null) return memResult;
 
   // For gate keys, check SQLite before Redis (persists across restarts)
-  if (isGateKey(key)) {
+  if (isPersistentKey(key)) {
     const sqlResult = sqliteGet<T>(key);
     if (sqlResult !== null) {
       memSet(key, sqlResult, 3600); // warm memory cache

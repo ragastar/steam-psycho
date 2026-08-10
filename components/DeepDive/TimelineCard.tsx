@@ -14,6 +14,7 @@ interface TimelineCardProps {
     trendStable: string;
     trendDeclining: string;
     trendInactive: string;
+    trendUnknown: string;
   };
 }
 
@@ -22,6 +23,7 @@ const TREND_STYLES: Record<string, { icon: string; color: string }> = {
   stable: { icon: "📊", color: "text-blue-400" },
   declining: { icon: "📉", color: "text-yellow-400" },
   inactive: { icon: "💤", color: "text-gray-500" },
+  unknown: { icon: "❔", color: "text-gray-500" },
 };
 
 export function TimelineCard({ timeline, labels }: TimelineCardProps) {
@@ -31,6 +33,7 @@ export function TimelineCard({ timeline, labels }: TimelineCardProps) {
     stable: labels.trendStable,
     declining: labels.trendDeclining,
     inactive: labels.trendInactive,
+    unknown: labels.trendUnknown,
   }[timeline.trend];
 
   return (

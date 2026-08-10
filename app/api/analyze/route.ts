@@ -19,6 +19,7 @@ import { CACHE_TTL, portraitKey, profileKey, rateLimitKey, cardStatsKey, rarityK
 import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
+import { getClientIp } from "@/lib/http/client-ip";
 
 const ERROR_CODES: Record<string, number> = {
   INVALID_INPUT: 400,
@@ -65,8 +66,7 @@ async function fetchAchievementsForTopGames(
 export async function POST(req: Request) {
   try {
     // Rate limiting
-    const forwarded = req.headers.get("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || "unknown";
+    const ip = getClientIp(req);
     const rateLimitCount = await incrementRateLimit(rateLimitKey(ip), CACHE_TTL.rateLimit);
     const rateLimit = parseInt(process.env.RATE_LIMIT_PER_HOUR || "30", 10);
     if (rateLimitCount > rateLimit) {
@@ -202,8 +202,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ steamId64, cached: false });
   } catch (err) {
-    const forwarded2 = req.headers.get("x-forwarded-for");
-    const errIp = forwarded2?.split(",")[0]?.trim() || "unknown";
+    const errIp = getClientIp(req);
     const errIpHash = hashIp(errIp);
 
     if (err instanceof SteamApiError) {

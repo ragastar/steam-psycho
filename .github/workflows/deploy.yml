@@ -9,7 +9,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Проверки идут ДО выкладки. Раньше образ собирался сразу на боевом сервере,
+  # и любая ошибка обнаруживалась только там.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH

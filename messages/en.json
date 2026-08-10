@@ -108,7 +108,8 @@
       "trendRising": "Rising",
       "trendStable": "Stable",
       "trendDeclining": "Declining",
-      "trendInactive": "Inactive"
+      "trendInactive": "Inactive",
+      "trendUnknown": "Unknown"
     },
     "social": {
       "title": "Social Graph",
@@ -131,7 +132,7 @@
     },
     "ranks": {
       "title": "Among All Players",
-      "subtitle": "Your rank compared to other Steam gamers",
+      "subtitle": "Rough estimate based on typical Steam player distribution — not a precise measurement",
       "hours": "Hours Played",
       "hoursDesc": "Total playtime compared to others",
       "library": "Library Size",

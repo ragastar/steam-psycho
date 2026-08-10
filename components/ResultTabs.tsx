@@ -16,7 +16,6 @@ import { SocialCard } from "./DeepDive/SocialCard";
 import { PatternsGrid } from "./DeepDive/PatternsGrid";
 import { RanksCard } from "./DeepDive/RanksCard";
 import { BadgesCard } from "./DeepDive/BadgesCard";
-import { TelegramGate } from "./TelegramGate";
 import { PsychSummaryCard } from "./PsychoProfile/PsychSummaryCard";
 import { BigFiveChart } from "./PsychoProfile/BigFiveChart";
 import { MotivationBars } from "./PsychoProfile/MotivationBars";
@@ -172,7 +171,10 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   locale={locale}
                 />
 
-                <TelegramGate steamId64={steamId64} locale={locale}>
+                {/* Замок здесь больше не нужен: до этого места доходят только
+                    те, кому сервер уже открыл доступ. Раньше содержимое
+                    приезжало в браузер целиком и пряталось размытием. */}
+                <div>
                   <div className="px-6 pb-6 space-y-5 relative z-10">
                     {/* Rarity badge */}
                     <div className="flex justify-end">
@@ -220,12 +222,12 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                       <MetricCard
                         label={t("result.totalGames")}
                         value={String(profile.stats.totalGames)}
-                        sub={`Top ${100 - profile.ranks.librarySizePercentile}%`}
+                        sub={`≈ Top ${100 - profile.ranks.librarySizePercentile}%`}
                       />
                       <MetricCard
                         label={t("result.totalHours")}
                         value={String(profile.stats.totalPlaytimeHours)}
-                        sub={`Top ${100 - profile.ranks.hoursPercentile}%`}
+                        sub={`≈ Top ${100 - profile.ranks.hoursPercentile}%`}
                       />
                       <MetricCard
                         label={t("result.steamLevel")}
@@ -249,13 +251,12 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                       </div>
                     </div>
                   </div>
-                </TelegramGate>
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === "psycho" && portrait.psycho_profile && (
-            <TelegramGate steamId64={steamId64} locale={locale}>
             <div className="space-y-4">
               <PsychSummaryCard
                 summary={portrait.psycho_profile.psych_summary}
@@ -314,11 +315,9 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                 }}
               />
             </div>
-            </TelegramGate>
           )}
 
           {activeTab === "deepdive" && (
-            <TelegramGate steamId64={steamId64} locale={locale}>
               <div className="space-y-4">
                 <EconomicsCard
                   stats={profile.stats}
@@ -350,8 +349,8 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   labels={{
                     title: t("deepDive.platforms.title"),
                     windows: "Windows",
+                    mac: "macOS",
                     linux: "Linux",
-                    deck: "Steam Deck",
                   }}
                 />
                 <TimelineCard
@@ -368,6 +367,7 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                     trendStable: t("deepDive.timeline.trendStable"),
                     trendDeclining: t("deepDive.timeline.trendDeclining"),
                     trendInactive: t("deepDive.timeline.trendInactive"),
+                    trendUnknown: t("deepDive.timeline.trendUnknown"),
                   }}
                 />
                 <SocialCard
@@ -424,7 +424,6 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   }}
                 />
               </div>
-            </TelegramGate>
           )}
         </TabContainer>
       </div>

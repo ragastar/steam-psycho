@@ -36,7 +36,7 @@ export function RanksCard({ ranks, labels }: RanksCardProps) {
               <div className="flex justify-between text-xs mb-0.5">
                 <span className="text-gray-300 font-medium">{item.label}</span>
                 <span className={`font-mono font-bold ${top <= 5 ? "text-yellow-400" : top <= 20 ? "text-purple-400" : "text-gray-300"}`}>
-                  Top {top}%
+                  ≈ Top {top}%
                 </span>
               </div>
               <div className="w-full bg-gray-800 rounded-full h-2.5 mb-1">

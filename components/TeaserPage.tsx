@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { TelegramGate } from "./TelegramGate";
-import type { AggregatedProfile } from "@/lib/aggregation/types";
+import type { TeaserProfile } from "@/lib/access/redact";
 import type { Rarity } from "@/lib/llm/types";
 
 interface TeaserPageProps {
-  profile: AggregatedProfile;
+  /** Урезанная витрина, а не полный профиль — см. lib/access/redact. */
+  profile: TeaserProfile;
   steamId64: string;
   locale: string;
   rarity: Rarity;
@@ -43,11 +44,14 @@ const FEATURES = [
 export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPageProps) {
   const t = useTranslations();
   const router = useRouter();
-  const gateDisabled = process.env.NEXT_PUBLIC_DISABLE_GATE === "true";
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  // Одна генерация на монтирование: каждый лишний вызов — это платный запрос.
+  const startedRef = useRef(false);
 
   const triggerGeneration = useCallback(async () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
     setGenerating(true);
     setError("");
     try {
@@ -60,6 +64,7 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
         const data = await res.json().catch(() => ({}));
         setError(data.message || "Generation failed");
         setGenerating(false);
+        startedRef.current = false; // Дать повторить после ошибки.
         return;
       }
       // Portrait generated — reload page to show full result
@@ -67,6 +72,7 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
     } catch {
       setError("Network error. Please try again.");
       setGenerating(false);
+      startedRef.current = false;
     }
   }, [steamId64, locale, router]);
 
@@ -74,10 +80,9 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
     triggerGeneration();
   }, [triggerGeneration]);
 
-  // Auto-trigger if gate disabled
-  if (gateDisabled && !generating) {
-    triggerGeneration();
-  }
+  // Автозапуск при отключённом гейте убран: он стоял прямо в теле отрисовки и
+  // мог сработать несколько раз за один рендер — каждый раз платный вызов.
+  // Отладочный обход теперь серверный (DISABLE_GATE), а не браузерный.
 
   const borderClass = RARITY_BORDER[rarity];
   const badgeClass = RARITY_BADGE_BG[rarity];

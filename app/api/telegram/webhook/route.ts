@@ -9,9 +9,16 @@ export async function POST(req: Request) {
     console.error("[webhook] ensureWebhook background error:", err),
   );
 
-  // 1. Validate secret token
+  // 1. Validate secret token.
+  // Раньше условие было «если секрет задан» — при пустой переменной обработчик
+  // принимал любой POST, и можно было подделать событие с чужим Telegram ID.
+  // Нет секрета — не принимаем ничего.
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (secret && req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
+  if (!secret) {
+    console.error("[webhook] TELEGRAM_WEBHOOK_SECRET не задан — приём событий отключён");
+    return new Response("Webhook secret not configured", { status: 503 });
+  }
+  if (req.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) {
     return new Response("Unauthorized", { status: 401 });
   }
 

@@ -12,6 +12,10 @@ const SP_TAGS = new Set([
 ]);
 const INDIE_TAGS = new Set(["Indie"]);
 
+// Ниже двух часов цена часа превращается в абсурд ($600/ч за 6 минут),
+// поэтому порог общий и для экономики, и для списка топ-игр.
+const MIN_HOURS_FOR_PPH = 2;
+
 export interface CardStats {
   dedication: number;
   mastery: number;
@@ -27,8 +31,6 @@ function calculateEconomics(games: EnrichedGame[]): AggregatedProfile["economics
   let wastedValue = 0;
   let freeCount = 0;
   let bestDeal: { name: string; pricePerHour: number } | null = null;
-
-  const MIN_HOURS_FOR_PPH = 2; // Minimum 2 hours to calculate $/h
 
   for (const game of games) {
     if (game.isFree) {
@@ -66,25 +68,22 @@ function calculateEconomics(games: EnrichedGame[]): AggregatedProfile["economics
 
 // --- Platforms ---
 function calculatePlatforms(games: OwnedGame[]): AggregatedProfile["platforms"] {
-  let win = 0, linux = 0, deck = 0;
+  let win = 0, mac = 0, linux = 0;
   for (const g of games) {
     win += g.playtime_windows_forever || 0;
+    mac += g.playtime_mac_forever || 0;
     linux += g.playtime_linux_forever || 0;
-    // Steam Deck uses linux playtime but we separate if mac field present
-    // In practice, playtime_linux_forever includes Deck
   }
-  // Approximate: Deck = portion of linux playtime (heuristic)
-  deck = Math.round(linux * 0.3); // rough estimate
-  linux = linux - deck;
 
-  const total = win + linux + deck;
-  if (total === 0) return { windowsPercentage: 100, linuxPercentage: 0, deckPercentage: 0 };
+  const total = win + mac + linux;
+  if (total === 0) return { windowsPercentage: 100, macPercentage: 0, linuxPercentage: 0 };
 
-  return {
-    windowsPercentage: Math.round((win / total) * 100),
-    linuxPercentage: Math.round((linux / total) * 100),
-    deckPercentage: Math.round((deck / total) * 100),
-  };
+  // Округляем две доли, третью добираем остатком — иначе сумма гуляет 99–101.
+  const windowsPercentage = Math.round((win / total) * 100);
+  const macPercentage = Math.round((mac / total) * 100);
+  const linuxPercentage = 100 - windowsPercentage - macPercentage;
+
+  return { windowsPercentage, macPercentage, linuxPercentage };
 }
 
 // --- Timeline ---
@@ -108,10 +107,20 @@ function calculateTimeline(
   const recentHours = recentGames.reduce((a, g) => a + (g.playtime_2weeks || 0), 0) / 60;
   const currentMonthlyHours = Math.round(recentHours * 2 * 10) / 10; // 2 weeks → monthly
 
-  let trend: "rising" | "stable" | "declining" | "inactive" = "stable";
-  if (recentHours === 0) trend = "inactive";
-  else if (currentMonthlyHours > avgMonthlyHours * 1.3) trend = "rising";
-  else if (currentMonthlyHours < avgMonthlyHours * 0.5) trend = "declining";
+  let trend: AggregatedProfile["timeline"]["trend"];
+  if (accountAge <= 0) {
+    // Профиль скрывает дату регистрации — среднего нет, сравнивать не с чем.
+    // Раньше среднее было нулём, и «рост» выдавался всем подряд.
+    trend = "unknown";
+  } else if (recentHours === 0) {
+    trend = "inactive";
+  } else if (currentMonthlyHours > avgMonthlyHours * 1.3) {
+    trend = "rising";
+  } else if (currentMonthlyHours < avgMonthlyHours * 0.5) {
+    trend = "declining";
+  } else {
+    trend = "stable";
+  }
 
   const lastActivityDate = player.lastlogoff
     ? new Date(player.lastlogoff * 1000).toISOString().split("T")[0]
@@ -119,8 +128,7 @@ function calculateTimeline(
 
   return {
     accountAge,
-    peakYear: null, // Not reliably determinable from available data
-    peakMonthlyHours: Math.round(avgMonthlyHours * 1.5 * 10) / 10, // estimate
+    avgMonthlyHours: Math.round(avgMonthlyHours * 10) / 10,
     currentMonthlyHours,
     trend,
     lastActivityDate,
@@ -133,20 +141,34 @@ function calculateSocial(friends: SteamFriend[]): AggregatedProfile["social"] {
     return { friendsCount: 0, oldestFriend: null, newestFriend: null, friendsAddedPerYear: 0 };
   }
 
-  const sorted = [...friends].sort((a, b) => a.friend_since - b.friend_since);
-  const oldest = sorted[0];
-  const newest = sorted[sorted.length - 1];
+  // Steam для части дружб отдаёт friend_since = 0. Без фильтра такая запись
+  // всплывает первой и даёт «друга с 1970 года» и срок дружбы в 56 лет.
+  const dated = friends
+    .filter((f) => f.friend_since > 0)
+    .sort((a, b) => a.friend_since - b.friend_since);
+
+  if (dated.length === 0) {
+    return {
+      friendsCount: friends.length,
+      oldestFriend: null,
+      newestFriend: null,
+      friendsAddedPerYear: 0,
+    };
+  }
+
+  const oldest = dated[0];
+  const newest = dated[dated.length - 1];
 
   const now = Date.now() / 1000;
-  const accountSpanYears = oldest ? (now - oldest.friend_since) / (365.25 * 24 * 3600) : 1;
-  const friendsAddedPerYear = accountSpanYears > 0
-    ? Math.round((friends.length / accountSpanYears) * 10) / 10
-    : friends.length;
+  const spanYears = (now - oldest.friend_since) / (365.25 * 24 * 3600);
+  const friendsAddedPerYear = spanYears > 0
+    ? Math.round((dated.length / spanYears) * 10) / 10
+    : dated.length;
 
   return {
     friendsCount: friends.length,
-    oldestFriend: oldest ? { steamid: oldest.steamid, since: oldest.friend_since } : null,
-    newestFriend: newest ? { steamid: newest.steamid, since: newest.friend_since } : null,
+    oldestFriend: { steamid: oldest.steamid, since: oldest.friend_since },
+    newestFriend: { steamid: newest.steamid, since: newest.friend_since },
     friendsAddedPerYear,
   };
 }
@@ -216,19 +238,25 @@ function calculatePatterns(
   if (top3Ratio > 0.7) bingeStyle = "binger";
   else if (top3Ratio < 0.3) bingeStyle = "sampler";
 
-  // Indie percentage
+  // Жанры и теги подгружаются только для топ-30 игр. Делить на размер всей
+  // библиотеки нельзя: при 1000 играх максимум получался бы 3%.
   let indieCount = 0;
+  let withGenreData = 0;
   for (const g of games) {
     const allTags = [...Object.keys(g.tags), ...g.genres];
+    if (allTags.length === 0) continue;
+    withGenreData++;
     if (allTags.some((t) => INDIE_TAGS.has(t))) indieCount++;
   }
-  const indiePercentage = games.length > 0 ? Math.round((indieCount / games.length) * 100) : 0;
+  const indiePercentage = withGenreData > 0
+    ? Math.round((indieCount / withGenreData) * 100)
+    : 0;
 
   return {
     genreConcentration,
     bingeStyle,
     indiePercentage,
-    medianReleaseYear: null, // Would need store API release_date data
+    indieSampleSize: withGenreData,
   };
 }
 
@@ -386,7 +414,8 @@ export function buildAggregatedProfile(
     const vsAverage = avgForeverHours && avgForeverHours > 0
       ? Math.round((playtimeHours / avgForeverHours) * 10) / 10
       : undefined;
-    const pricePerHour = g.price && playtimeHours > 0
+    // Тот же порог, что и в экономике: ниже двух часов цена часа абсурдна.
+    const pricePerHour = g.price && playtimeHours >= MIN_HOURS_FOR_PPH
       ? Math.round((g.price / playtimeHours) * 100) / 100
       : undefined;
 

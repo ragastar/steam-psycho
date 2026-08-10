@@ -10,6 +10,8 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
+import { getAccessLevel } from "@/lib/access/entitlement";
+import { toTeaserProfile } from "@/lib/access/redact";
 
 interface Props {
   params: { id: string; locale: string };
@@ -49,7 +51,29 @@ export default async function ResultPage({ params }: Props) {
   let portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
 
-  // Teaser: profile exists but no portrait yet (pre-subscription state)
+  // Решение о доступе принимает сервер. Пока доступа нет, ни портрет, ни полный
+  // профиль в браузер не уезжают — раньше они уходили целиком и лишь размывались.
+  const access = await getAccessLevel(params.id);
+
+  if (access !== "full" && profile) {
+    const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
+    return (
+      <div className="min-h-screen">
+        <div className="absolute top-4 right-4 z-30">
+          <LocaleSwitcher />
+        </div>
+        <TeaserPage
+          profile={toTeaserProfile(profile)}
+          steamId64={params.id}
+          locale={params.locale}
+          rarity={cachedRarity ?? "common"}
+        />
+      </div>
+    );
+  }
+
+  // Доступ есть, но портрет ещё не сгенерирован — показываем ту же витрину,
+  // она сама запустит генерацию.
   if (!portrait && profile) {
     const cachedStats = await getCache<CardStats>(cardStatsKey(params.id));
     const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
@@ -60,7 +84,7 @@ export default async function ResultPage({ params }: Props) {
             <LocaleSwitcher />
           </div>
           <TeaserPage
-            profile={profile}
+            profile={toTeaserProfile(profile)}
             steamId64={params.id}
             locale={params.locale}
             rarity={cachedRarity}

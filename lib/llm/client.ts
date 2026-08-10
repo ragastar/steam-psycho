@@ -14,22 +14,42 @@ export interface LLMConfig {
 }
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
-  anthropic: "claude-sonnet-4-20250514",
+  anthropic: "claude-sonnet-4-5",
   openai: "openai/gpt-4o-mini",
 };
 
-function getAvailableProvider(): LLMProvider {
-  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
-  if (process.env.OPENAI_API_KEY) return "openai";
-  throw new Error("No LLM API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.");
-}
+const PROVIDERS: LLMProvider[] = ["anthropic", "openai"];
 
-function resolveConfig(provider?: LLMProvider): LLMConfig {
-  const resolved = provider || (process.env.LLM_PROVIDER as LLMProvider) || getAvailableProvider();
-  return {
-    provider: resolved,
-    model: DEFAULT_MODELS[resolved],
-  };
+/**
+ * Раньше поставщик угадывался по наличию ключа, причём Anthropic был
+ * приоритетнее. Пример настроек предлагал заполнить оба ключа — и запросы
+ * молча уходили напрямую в Anthropic мимо OpenRouter. Теперь выбор явный,
+ * а неизвестное значение падает сразу, а не в середине генерации.
+ */
+export function resolveConfig(provider?: LLMProvider): LLMConfig {
+  const fromEnv = process.env.LLM_PROVIDER?.trim();
+  if (!provider && fromEnv && !PROVIDERS.includes(fromEnv as LLMProvider)) {
+    throw new Error(
+      `LLM_PROVIDER="${fromEnv}" — неизвестный поставщик. Допустимо: ${PROVIDERS.join(", ")}`,
+    );
+  }
+
+  let resolved = provider || (fromEnv as LLMProvider | undefined);
+  if (!resolved) {
+    // По умолчанию идём через OpenRouter — под него написан весь проект.
+    if (process.env.OPENAI_API_KEY) resolved = "openai";
+    else if (process.env.ANTHROPIC_API_KEY) resolved = "anthropic";
+    else throw new Error("Не задан ни один ключ LLM: нужен OPENAI_API_KEY (OpenRouter) или ANTHROPIC_API_KEY.");
+  }
+
+  // OPENROUTER_MODEL раньше читался только в переводчике, а для портрета
+  // модель была зашита в коде — смена настройки молча ничего не делала.
+  const model =
+    resolved === "openai"
+      ? process.env.OPENROUTER_MODEL?.trim() || DEFAULT_MODELS.openai
+      : process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODELS.anthropic;
+
+  return { provider: resolved, model };
 }
 
 // --- JSON extraction ---
@@ -161,23 +181,29 @@ async function generateWithOpenAI(
 
 // --- Public API ---
 
+export interface GenerationResult {
+  portrait: CardPortrait;
+  /** Что реально отработало — статистика раньше писала значение из настроек. */
+  provider: LLMProvider;
+  model: string;
+}
+
 export async function generatePortrait(
   profile: AggregatedProfile,
   cardStats: CardStats,
   rarity: Rarity,
   locale: string,
   provider?: LLMProvider,
-): Promise<CardPortrait> {
+): Promise<GenerationResult> {
   const config = resolveConfig(provider);
+  const model = config.model!;
 
-  switch (config.provider) {
-    case "anthropic":
-      return generateWithAnthropic(profile, cardStats, rarity, locale, config.model!);
-    case "openai":
-      return generateWithOpenAI(profile, cardStats, rarity, locale, config.model!);
-    default:
-      throw new Error(`Unknown LLM provider: ${config.provider}`);
-  }
+  const portrait =
+    config.provider === "anthropic"
+      ? await generateWithAnthropic(profile, cardStats, rarity, locale, model)
+      : await generateWithOpenAI(profile, cardStats, rarity, locale, model);
+
+  return { portrait, provider: config.provider, model };
 }
 
 export function getAvailableProviders(): { id: LLMProvider; name: string; model: string; available: boolean }[] {
@@ -185,13 +211,13 @@ export function getAvailableProviders(): { id: LLMProvider; name: string; model:
     {
       id: "anthropic",
       name: "Claude (Anthropic)",
-      model: DEFAULT_MODELS.anthropic,
+      model: process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODELS.anthropic,
       available: !!process.env.ANTHROPIC_API_KEY,
     },
     {
       id: "openai",
-      name: "GPT (OpenAI)",
-      model: DEFAULT_MODELS.openai,
+      name: "GPT (OpenRouter)",
+      model: process.env.OPENROUTER_MODEL?.trim() || DEFAULT_MODELS.openai,
       available: !!process.env.OPENAI_API_KEY,
     },
   ];

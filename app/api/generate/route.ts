@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { generatePortrait } from "@/lib/llm/client";
+import { applyComputedFacts } from "@/lib/llm/facts";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { CACHE_TTL, portraitKey, profileKey, cardStatsKey, rarityKey, rateLimitKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
+import { getClientIp } from "@/lib/http/client-ip";
+import { getAccessLevel } from "@/lib/access/entitlement";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 import type { CardStats } from "@/lib/aggregation/aggregate";
 import type { Rarity } from "@/lib/llm/types";
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+
   try {
     // Rate limiting
-    const forwarded = req.headers.get("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || "unknown";
     const rateLimitCount = await incrementRateLimit(rateLimitKey(ip), CACHE_TTL.rateLimit);
     const rateLimit = parseInt(process.env.RATE_LIMIT_PER_HOUR || "30", 10);
     if (rateLimitCount > rateLimit) {
@@ -33,6 +36,15 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: true, code: "INVALID_INPUT", message: "steamId64 is required" },
         { status: 400 },
+      );
+    }
+
+    // Доступ проверяется ЗДЕСЬ, а не в компоненте перед вызовом.
+    // Раньше эта точка генерировала платный портрет любому, кто знает Steam ID.
+    if ((await getAccessLevel(steamId64)) !== "full") {
+      return NextResponse.json(
+        { error: true, code: "ACCESS_REQUIRED", message: "Портрет ещё не открыт" },
+        { status: 403 },
       );
     }
 
@@ -61,8 +73,11 @@ export async function POST(req: Request) {
 
     // 3. Generate portrait via LLM
     const t0 = Date.now();
-    const portrait = await generatePortrait(profile, cardStats, rarity, locale);
-    console.log(`[generate] ${steamId64} LLM: ${Date.now() - t0}ms`);
+    const generated = await generatePortrait(profile, cardStats, rarity, locale);
+    console.log(`[generate] ${steamId64} LLM: ${Date.now() - t0}ms (${generated.provider}/${generated.model})`);
+
+    // Числа берём свои: модель регулярно перевирает статы, которые ей дали.
+    const portrait = applyComputedFacts(generated.portrait, cardStats, rarity);
 
     // 4. Load card identity (cached during analyze)
     const cardIdentity = await getCache<{ element: string }>(`art:identity:${steamId64}`)
@@ -81,18 +96,17 @@ export async function POST(req: Request) {
       librarySize: profile.stats.totalGames,
       totalPlaytimeHours: profile.stats.totalPlaytimeHours,
       accountAgeYears: profile.timeline?.accountAge,
-      llmProvider: process.env.LLM_PROVIDER || "openai",
+      // Пишем то, что реально отработало, а не значение из настроек.
+      llmProvider: `${generated.provider}/${generated.model}`,
     });
 
     return NextResponse.json({ status: "generated" });
   } catch (err) {
     console.error("[generate] error:", err);
-    const forwarded2 = req.headers.get("x-forwarded-for");
-    const errIp = forwarded2?.split(",")[0]?.trim() || "unknown";
     logError({
       type: "GENERATE_ERROR",
       message: err instanceof Error ? err.message : "Unknown",
-      ipHash: hashIp(errIp),
+      ipHash: hashIp(ip),
       endpoint: "/api/generate",
     });
     return NextResponse.json(

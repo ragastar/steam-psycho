@@ -139,12 +139,11 @@ async function handleGateCheck(
     console.error("[gate] Subscription check failed:", channelId, "user:", userId, "error:", errMsg);
 
     if (errMsg.includes("bot is not a member") || errMsg.includes("chat not found") || errMsg.includes("CHAT_ADMIN_REQUIRED") || errMsg.includes("member list is inaccessible")) {
-      console.error("[gate] CRITICAL: Bot cannot check channel membership. Add bot as admin to", channelId);
-      await setCache(gateTokenKey(token), { ...data, status: "unlocked" }, CACHE_TTL.gate);
-      logGateEvent({ steamId64: data.steamId64, event: "unlocked" });
-      await reply(msg.unlocked);
-    } else {
-      await reply(msg.error);
+      // Раньше здесь выдавался доступ «чтобы не ломать пользователя». Это
+      // означало: сломай проверку канала — и получай результат бесплатно.
+      // Настройка бота — наша проблема, а не повод раздавать платное.
+      console.error("[gate] CRITICAL: бот не может проверить подписку, сделай его админом канала", channelId);
     }
+    await reply(msg.error);
   }
 }

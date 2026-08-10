@@ -43,7 +43,8 @@ const SYSTEM_PROMPT_RU = `Ты — безумный игровой психол�
 - rarity и stats УЖЕ ВЫЧИСЛЕНЫ — ТОЧНЫЕ значения из CARD DATA
 - primaryArchetype = 50% личности, secondaryArchetype = 30%, shadowArchetype = 20%
 - Архетипы должны быть ДЕРЗКИМИ и СМЕШНЫМИ: не "Казуальный исследователь" а "Фулл-Рандом Дегенерат", не "Коллекционер" а "Бомж-Барахольщик Халявы"
-- 5-6 roasts ОБЯЗАТЕЛЬНО, каждый с реальной цифрой. Severity: critical=99й перцентиль, legendary=95й, epic=85й, rare=60й+
+- 5-6 roasts ОБЯЗАТЕЛЬНО, каждый с реальной цифрой ИЗ CARD DATA. Severity по тому, насколько цифра экстремальна: critical=полная дичь, legendary=очень много, epic=заметно выше обычного, rare=есть о чём пошутить
+- НИКОГДА не выдумывай числа, которых нет в CARD DATA. Нет данных — шути без цифры
 - Roasts должны БИТЬ В БОЛЬНОЕ: не "Вы играете много в Dota" а "Ёбаный ты задрот, 3000 часов в Доту слил — мог бы язык выучить или хотя бы пресс накачать"
 - spirit_game: из топ игр, ТОЧНОЕ название
 - spirit_animal: ЛЮБОЕ существо (мифическое, реальное, фэнтезийное), НЕ из фиксированного пула. Чем точнее и абсурднее — тем лучше. "Ленивец с геморроем" если чел играет по 30 мин в неделю
@@ -98,7 +99,8 @@ RULES:
 - rarity and stats are ALREADY COMPUTED — use EXACT values from CARD DATA
 - primaryArchetype = 50% of personality, secondaryArchetype = 30%, shadowArchetype = 20%
 - Archetypes must be SAVAGE and FUNNY: not "Casual Explorer" but "Full-Random Degenerate", not "Collector" but "Digital Hoarder of Broken Dreams"
-- 5-6 roasts REQUIRED, each with a real number. Severity: critical=99th pctl, legendary=95th, epic=85th, rare=60th+
+- 5-6 roasts REQUIRED, each with a real number FROM CARD DATA. Pick severity by how extreme the number is: critical=absolutely unhinged, legendary=very high, epic=clearly above normal, rare=worth a jab
+- NEVER invent numbers that are not in CARD DATA. No data — joke without a figure
 - Roasts must HIT WHERE IT HURTS: not "You play a lot of Dota" but "3000 hours in Dota, holy shit — you could've learned a language, got abs, or at least touched grass"
 - spirit_game: from top games, EXACT name
 - spirit_animal: ANY creature (mythical, real, fantasy), NOT from a fixed pool. The more accurate and absurd the better. "A sloth with hemorrhoids" if they play 30 min/week
@@ -174,7 +176,7 @@ ECONOMICS:
 ACHIEVEMENTS:
 ${achvStr}
 
-PLATFORMS: Windows ${profile.platforms.windowsPercentage}% / Linux ${profile.platforms.linuxPercentage}% / Deck ${profile.platforms.deckPercentage}%
+PLATFORMS: Windows ${profile.platforms.windowsPercentage}% / macOS ${profile.platforms.macPercentage}% / Linux ${profile.platforms.linuxPercentage}%
 
 TIMELINE:
 - Account age: ${profile.timeline.accountAge} years

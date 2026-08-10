@@ -42,3 +42,8 @@ next-env.d.ts
 # PRD docs
 /extract/
 *.docx
+
+# серверные файлы деплоя (не должны уезжать в репозиторий)
+/docker-compose.override.yml
+/enable-tls.sh
+/enable-tls.log
