@@ -74,7 +74,13 @@ export async function POST(req: Request) {
     // 3. Generate portrait via LLM
     const t0 = Date.now();
     const generated = await generatePortrait(profile, cardStats, rarity, locale);
-    console.log(`[generate] ${steamId64} LLM: ${Date.now() - t0}ms (${generated.provider}/${generated.model})`);
+    const u = generated.usage;
+    const usageNote = u
+      ? ` ввод ${u.input} (из кеша ${u.cachedInput}), вывод ${u.output}`
+      : "";
+    console.log(
+      `[generate] ${steamId64} LLM: ${Date.now() - t0}ms (${generated.provider}/${generated.model})${usageNote}`,
+    );
 
     // Числа берём свои: модель регулярно перевирает статы, которые ей дали.
     const portrait = applyComputedFacts(generated.portrait, cardStats, rarity);

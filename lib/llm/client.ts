@@ -1,10 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import type { AggregatedProfile } from "../aggregation/types";
 import type { CardPortrait, Rarity } from "./types";
 import type { CardStats } from "../aggregation/aggregate";
 import { CardPortraitSchema } from "./types";
 import { getSystemPrompt, buildUserPrompt } from "./prompt";
+import { generateWithAnthropic as generatePortraitViaAnthropic } from "./providers/anthropic";
 
 export type LLMProvider = "anthropic" | "openai";
 
@@ -14,7 +14,9 @@ export interface LLMConfig {
 }
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
-  anthropic: "claude-sonnet-4-5",
+  // Должно совпадать с DEFAULT_MODEL в providers/anthropic.ts,
+  // иначе статистика и админка покажут не ту модель, что отработала.
+  anthropic: "claude-opus-5",
   openai: "openai/gpt-4o-mini",
 };
 
@@ -67,59 +69,8 @@ function extractJSON(text: string): unknown {
 }
 
 // --- Anthropic (Claude) ---
-
-async function generateWithAnthropic(
-  profile: AggregatedProfile,
-  cardStats: CardStats,
-  rarity: Rarity,
-  locale: string,
-  model: string,
-): Promise<CardPortrait> {
-  const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    timeout: 45_000,
-  });
-
-  const response = await client.messages.create({
-    model,
-    max_tokens: 5000,
-    system: getSystemPrompt(locale),
-    messages: [{ role: "user", content: buildUserPrompt(profile, cardStats, rarity) }],
-  });
-
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text in Anthropic response");
-  }
-
-  const json = extractJSON(textBlock.text);
-  const parsed = CardPortraitSchema.safeParse(json);
-  if (parsed.success) return parsed.data;
-
-  // Retry — wrap in try/catch to avoid doubling timeout
-  try {
-    const retry = await client.messages.create({
-      model,
-      max_tokens: 5000,
-      system: getSystemPrompt(locale),
-      messages: [
-        { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
-        { role: "assistant", content: textBlock.text },
-        {
-          role: "user",
-          content: `The JSON was invalid. Errors: ${parsed.error.issues.map((e) => e.message).join(", ")}. Fix and return ONLY valid JSON.`,
-        },
-      ],
-    });
-
-    const retryText = retry.content.find((b) => b.type === "text");
-    if (!retryText || retryText.type !== "text") throw new Error("No text in retry");
-    return CardPortraitSchema.parse(extractJSON(retryText.text));
-  } catch (retryErr) {
-    console.error("[llm] Anthropic retry failed:", retryErr instanceof Error ? retryErr.message : retryErr);
-    throw new Error("LLM retry failed: " + (retryErr instanceof Error ? retryErr.message : "unknown"));
-  }
-}
+// Реализация вынесена в providers/anthropic.ts: там кеширование системного
+// промпта, схема ответа и обработка отказа классификатора.
 
 // --- OpenAI ---
 
@@ -186,6 +137,8 @@ export interface GenerationResult {
   /** Что реально отработало — статистика раньше писала значение из настроек. */
   provider: LLMProvider;
   model: string;
+  /** Расход токенов: позволяет считать реальную стоимость портрета. */
+  usage?: { input: number; output: number; cachedInput: number };
 }
 
 export async function generatePortrait(
@@ -198,11 +151,24 @@ export async function generatePortrait(
   const config = resolveConfig(provider);
   const model = config.model!;
 
-  const portrait =
-    config.provider === "anthropic"
-      ? await generateWithAnthropic(profile, cardStats, rarity, locale, model)
-      : await generateWithOpenAI(profile, cardStats, rarity, locale, model);
+  if (config.provider === "anthropic") {
+    const result = await generatePortraitViaAnthropic(
+      getSystemPrompt(locale),
+      buildUserPrompt(profile, cardStats, rarity),
+    );
+    return {
+      portrait: result.portrait,
+      provider: "anthropic",
+      model: result.model,
+      usage: {
+        input: result.inputTokens,
+        output: result.outputTokens,
+        cachedInput: result.cachedInputTokens,
+      },
+    };
+  }
 
+  const portrait = await generateWithOpenAI(profile, cardStats, rarity, locale, model);
   return { portrait, provider: config.provider, model };
 }
 
