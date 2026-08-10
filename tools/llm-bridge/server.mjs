@@ -77,6 +77,12 @@ function runClaude({ system, prompt }, timeoutMs, cb) {
   delete env.CLAUDE_CODE_SSE_PORT;
   delete env.CLAUDE_CODE_ENTRYPOINT;
 
+  // Свой домашний каталог: иначе claude подхватит плагины, навыки и хук
+  // старта сессии владельца. Хук вставляет в каждую генерацию текст про
+  // суперспособности — в промпте про карточку это шум, который портит текст.
+  // Авторизацию кладёт туда deploy/llm-bridge-setup.sh.
+  if (process.env.BRIDGE_HOME) env.HOME = process.env.BRIDGE_HOME;
+
   const child = execFile(bin, args, { timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024, env },
     (err, stdout, stderr) => {
       if (!stdout) {

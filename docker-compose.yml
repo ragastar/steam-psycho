@@ -8,6 +8,10 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    # Доступ к мосту подписки Claude на хосте (tools/llm-bridge):
+    # host.docker.internal резолвится в шлюз сети этого контейнера.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - art-data:/data/art
       - db-data:/data/db

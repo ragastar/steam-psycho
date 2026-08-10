@@ -1,0 +1,22 @@
+[Unit]
+Description=GamerType — мост к подписке Claude (обёртка над claude -p)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Под root: бинарь и авторизация подписки лежат в /root/.claude
+# и /root/.vscode-server.
+User=root
+Environment=HOME=/root
+# Секрет, адрес и потолки — в файле вне репозитория.
+EnvironmentFile=/etc/gamertype-llm-bridge.env
+# HOME остаётся /root: там лежат бинари расширений VS Code, которые резолвит
+# мост. Дочернему процессу claude подставляется отдельный дом через
+# BRIDGE_HOME — см. шаг 0.
+ExecStart=/usr/bin/node /opt/steam-psycho/tools/llm-bridge/server.mjs
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
