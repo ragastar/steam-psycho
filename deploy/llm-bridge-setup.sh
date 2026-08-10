@@ -102,8 +102,15 @@ sed -i '/^CLAUDE_BRIDGE_ENDPOINT=/d;/^CLAUDE_BRIDGE_TOKEN=/d;/^CLAUDE_BRIDGE_TIM
 if [ -s "$PROJ_ENV" ] && [ -n "$(tail -c 1 "$PROJ_ENV")" ]; then
   printf '\n' >> "$PROJ_ENV"
 fi
+# Адрес моста для контейнера — ШЛЮЗ ЕГО СОБСТВЕННОЙ СЕТИ, а не
+# host.docker.internal. Проверено на живом сервере 2026-08-10:
+# extra_hosts "host.docker.internal:host-gateway" резолвится в docker0
+# (172.17.0.1), а мост слушает шлюз сети steam-psycho_default (172.19.0.1).
+# Через host.docker.internal контейнер получал "Connection refused", сайт
+# молча уходил на платный ключ ПРИ ЖИВОМ МОСТЕ — то есть подписка не
+# использовалась бы вообще, и заметить это было бы нечем.
 {
-  echo "CLAUDE_BRIDGE_ENDPOINT=http://host.docker.internal:$PORT/generate"
+  echo "CLAUDE_BRIDGE_ENDPOINT=http://$HOST_IP:$PORT/generate"
   echo "CLAUDE_BRIDGE_TOKEN=$TOKEN"
   echo "CLAUDE_BRIDGE_TIMEOUT_MS=${CLAUDE_BRIDGE_TIMEOUT_MS:-110000}"
   echo "CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS=${CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS:-115000}"
