@@ -98,5 +98,8 @@ export interface AggregatedProfile {
     librarySizePercentile: number;
     concentrationPercentile: number;
     veteranPercentile: number;
+    // true — грубая оценка по захардкоженным порогам (выборки ещё мало).
+    // false — посчитано по реальной статистике прошедших тест.
+    estimated: boolean;
   };
 }

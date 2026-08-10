@@ -140,7 +140,8 @@
       "concentration": "Focus",
       "concentrationDesc": "How much you stick to your top games",
       "veteran": "Steam Veteran",
-      "veteranDesc": "Account age + level + badges"
+      "veteranDesc": "Account age + level + badges",
+      "subtitleReal": "Your rank among everyone who has taken the test"
     },
     "badges": {
       "title": "Steam Badges",
@@ -231,25 +232,40 @@
     "invalidInput": {
       "title": "Invalid format",
       "description": "Could not recognize the Steam profile. Please check your input.",
-      "steps": ["Open your Steam profile", "Copy the URL from the address bar", "Paste the full link here"],
+      "steps": [
+        "Open your Steam profile",
+        "Copy the URL from the address bar",
+        "Paste the full link here"
+      ],
       "action": "Try again"
     },
     "profileNotFound": {
       "title": "Profile not found",
       "description": "Could not find a Steam profile with this link.",
-      "steps": ["Check the URL or SteamID is correct", "Make sure the profile exists"],
+      "steps": [
+        "Check the URL or SteamID is correct",
+        "Make sure the profile exists"
+      ],
       "action": "Try again"
     },
     "privateProfile": {
       "title": "Private profile",
       "description": "This Steam profile is private. Game data needs to be public.",
-      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Wait a couple minutes and try again"],
+      "steps": [
+        "Open Steam → Settings → Privacy",
+        "Set 'Game details' to Public",
+        "Wait a couple minutes and try again"
+      ],
       "action": "Try again"
     },
     "hiddenLibrary": {
       "title": "Library hidden",
       "description": "Profile is public but the game library is hidden in privacy settings.",
-      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Wait a couple minutes and try again"],
+      "steps": [
+        "Open Steam → Settings → Privacy",
+        "Set 'Game details' to Public",
+        "Wait a couple minutes and try again"
+      ],
       "action": "Try again"
     },
     "fewGames": {
@@ -260,13 +276,22 @@
     "emptyLibrary": {
       "title": "Empty library",
       "description": "No games found in the library or data is unavailable. The library may be hidden in Steam privacy settings.",
-      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Wait a couple minutes and try again"],
+      "steps": [
+        "Open Steam → Settings → Privacy",
+        "Set 'Game details' to Public",
+        "Wait a couple minutes and try again"
+      ],
       "action": "Try again"
     },
     "noPlaytime": {
       "title": "Playtime data hidden",
       "description": "Games are in the library, but playtime data is unavailable. Most likely, game stats are hidden in Steam privacy settings.",
-      "steps": ["Open Steam → Settings → Privacy", "Set 'Game details' to Public", "Make sure 'Playtime' is also set to Public", "Wait a couple minutes and try again"],
+      "steps": [
+        "Open Steam → Settings → Privacy",
+        "Set 'Game details' to Public",
+        "Make sure 'Playtime' is also set to Public",
+        "Wait a couple minutes and try again"
+      ],
       "action": "Try again"
     },
     "steamUnavailable": {

@@ -20,6 +20,8 @@ import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
 import { getClientIp } from "@/lib/http/client-ip";
+import { getPercentileSample } from "@/lib/analytics/queries";
+import { percentileRank } from "@/lib/aggregation/percentile";
 
 const ERROR_CODES: Record<string, number> = {
   INVALID_INPUT: 400,
@@ -172,6 +174,19 @@ export async function POST(req: Request) {
       badgesResponse,
       achievementsData,
     );
+
+    // 6.5 Заменяем прикидочные перцентили на реальные, если своей статистики
+    // уже достаточно. Иначе остаются пороги из кода, помеченные как оценка.
+    const sample = getPercentileSample();
+    if (sample) {
+      profile.ranks = {
+        hoursPercentile: percentileRank(sample.hours, profile.stats.totalPlaytimeHours),
+        librarySizePercentile: percentileRank(sample.library, profile.stats.totalGames),
+        concentrationPercentile: profile.ranks.concentrationPercentile,
+        veteranPercentile: percentileRank(sample.accountAge, profile.timeline.accountAge),
+        estimated: false,
+      };
+    }
 
     // 7. Calculate card stats and rarity
     const cardStats = calculateCardStats(profile);

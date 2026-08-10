@@ -1,3 +1,4 @@
+import { MIN_SAMPLE_FOR_REAL_PERCENTILES } from "../aggregation/percentile";
 import { getDb } from "./db";
 
 type Row = Record<string, unknown>;
@@ -218,5 +219,35 @@ export function getTableCounts() {
     errors: (queryOne<{ count: number }>("SELECT COUNT(*) as count FROM errors") ?? { count: 0 }).count,
     art_generations: (queryOne<{ count: number }>("SELECT COUNT(*) as count FROM art_generations") ?? { count: 0 }).count,
     gate_events: (queryOne<{ count: number }>("SELECT COUNT(*) as count FROM gate_events") ?? { count: 0 }).count,
+  };
+}
+
+// === Перцентили по собственной статистике (DATA-3) ===
+
+/**
+ * Отдаёт накопленные значения для расчёта настоящих перцентилей.
+ *
+ * Раньше перцентили были лесенкой захардкоженных порогов и выдавались за
+ * измерение. Здесь берутся реальные показатели тех, кто уже прошёл тест —
+ * и подписывать их надо именно так, а не «среди всех игроков Steam».
+ * Возвращает null, пока выборка слишком мала, чтобы что-то значить.
+ */
+export function getPercentileSample(): {
+  hours: number[];
+  library: number[];
+  accountAge: number[];
+} | null {
+  const rows = query<{ h: number | null; l: number | null; a: number | null }>(
+    `SELECT total_playtime_hours AS h, library_size AS l, account_age_years AS a
+     FROM analyses
+     WHERE cached = 0 AND total_playtime_hours IS NOT NULL`,
+  );
+
+  if (rows.length < MIN_SAMPLE_FOR_REAL_PERCENTILES) return null;
+
+  return {
+    hours: rows.map((r) => r.h).filter((v): v is number => v !== null),
+    library: rows.map((r) => r.l).filter((v): v is number => v !== null),
+    accountAge: rows.map((r) => r.a).filter((v): v is number => v !== null),
   };
 }

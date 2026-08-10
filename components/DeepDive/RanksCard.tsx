@@ -5,6 +5,7 @@ interface RanksCardProps {
   labels: {
     title: string;
     subtitle: string;
+    subtitleReal: string;
     hours: string;
     hoursDesc: string;
     library: string;
@@ -27,7 +28,9 @@ export function RanksCard({ ranks, labels }: RanksCardProps) {
   return (
     <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
       <h3 className="text-sm font-semibold text-gray-300 mb-1">{labels.title}</h3>
-      <p className="text-[10px] text-gray-600 mb-3">{labels.subtitle}</p>
+      <p className="text-[10px] text-gray-600 mb-3">
+        {ranks.estimated ? labels.subtitle : labels.subtitleReal}
+      </p>
       <div className="space-y-3">
         {items.map((item) => {
           const top = 100 - item.value;
@@ -36,7 +39,7 @@ export function RanksCard({ ranks, labels }: RanksCardProps) {
               <div className="flex justify-between text-xs mb-0.5">
                 <span className="text-gray-300 font-medium">{item.label}</span>
                 <span className={`font-mono font-bold ${top <= 5 ? "text-yellow-400" : top <= 20 ? "text-purple-400" : "text-gray-300"}`}>
-                  ≈ Top {top}%
+                  {ranks.estimated ? "≈ " : ""}Top {top}%
                 </span>
               </div>
               <div className="w-full bg-gray-800 rounded-full h-2.5 mb-1">

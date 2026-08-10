@@ -400,6 +400,7 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
                   labels={{
                     title: t("deepDive.ranks.title"),
                     subtitle: t("deepDive.ranks.subtitle"),
+                    subtitleReal: t("deepDive.ranks.subtitleReal"),
                     hours: t("deepDive.ranks.hours"),
                     hoursDesc: t("deepDive.ranks.hoursDesc"),
                     library: t("deepDive.ranks.library"),

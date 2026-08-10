@@ -311,6 +311,9 @@ function calculateRanks(
     librarySizePercentile: libPercentile(totalGames),
     concentrationPercentile: concPercentile(concentrationRatio),
     veteranPercentile: vetPercentile(accountAge),
+    // Пороги выше — прикидка, а не измерение. Маршрут анализа заменит их
+    // на реальные, когда своей статистики накопится достаточно.
+    estimated: true,
   };
 }
 
