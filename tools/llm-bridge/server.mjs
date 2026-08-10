@@ -12,6 +12,28 @@ const PORT = Number(process.env.BRIDGE_PORT || 8788);
 // а не docker0 — адрес подставляет deploy/llm-bridge-setup.sh.
 const HOST = process.env.BRIDGE_HOST || '127.0.0.1';
 const TOKEN = process.env.BRIDGE_TOKEN || '';
+
+// Защита от секрета, который никогда не совпадёт. Node.js разбирает значения
+// HTTP-заголовков как latin1, а process.env отдаёт корректную utf-8 строку.
+// Если BRIDGE_TOKEN содержит символы вне ASCII (например кириллицу), байты
+// заголовка x-bridge-token после latin1-декодирования дают другую JS-строку,
+// и сравнение `!== TOKEN` не совпадёт никогда — ни разу, ни у одного
+// клиента. Снаружи это выглядит как вечный 401 без единой зацепки на
+// причину: секрет вроде правильный, а мост всё равно отказывает. Тихо
+// продолжать работу с таким секретом нельзя — отказываем в старте сразу,
+// с понятным объяснением, а не роняем клиентов в необъяснимый 401 в проде.
+if (TOKEN && /[^\x00-\x7F]/.test(TOKEN)) {
+  console.error(
+    'BRIDGE_TOKEN содержит символы вне ASCII (например кириллицу). ' +
+    'Node.js разбирает значения HTTP-заголовков как latin1, а не как ' +
+    'utf-8, поэтому заголовок x-bridge-token НИКОГДА не совпадёт с таким ' +
+    'секретом — мост будет вечно отвечать 401, и причину не будет видно ' +
+    'снаружи. Задайте BRIDGE_TOKEN из ASCII-символов, например: ' +
+    'openssl rand -hex 32',
+  );
+  process.exit(1);
+}
+
 const TIMEOUT = Number(process.env.BRIDGE_TIMEOUT_MS || 180000);
 const HEALTH_TTL = Number(process.env.BRIDGE_HEALTH_TTL_MS || 60000);
 // Подписка по умолчанию отдаёт Opus 4.8 с окном в миллион токенов — для
@@ -70,6 +92,9 @@ function runClaude({ system, prompt }, timeoutMs, cb) {
     });
   child.stdin.on('error', () => {}); // не падать на EPIPE
   child.stdin.end(String(prompt || ''));
+  // Отдаём процесс наружу, чтобы вызывающий мог убить его, если клиент
+  // (сайт) оборвёт соединение раньше, чем claude ответит.
+  return child;
 }
 
 // --- проверка живости ---
@@ -78,6 +103,9 @@ function runClaude({ system, prompt }, timeoutMs, cb) {
 // запросу и с кешем, потому что каждый такой вызов тратит лимит подписки.
 // Никаких таймеров и внешних опросов заводить нельзя.
 let healthCache = { at: 0, value: null };
+// Список ожидающих колбэков ТЕКУЩЕГО настоящего вызова claude, или null,
+// если сейчас никакой реальный запрос не выполняется.
+let healthInFlight = null;
 
 function markAlive() {
   healthCache = { at: Date.now(), value: { status: 'ok', bin: resolveClaudeBin() } };
@@ -88,10 +116,22 @@ function checkHealth(cb) {
   if (bin !== 'claude' && !existsSync(bin)) return cb({ status: 'missing', bin });
   if (healthCache.value && Date.now() - healthCache.at < HEALTH_TTL) return cb(healthCache.value);
 
+  // Кеш протух. Без объединения два параллельных GET /health, пришедших
+  // между истечением кеша и записью нового значения, оба увидят "кеша нет"
+  // и оба запустят настоящий вызов claude — задвоив трату лимита подписки
+  // ровно в том сценарии, от которого кеш должен защищать. Поэтому первый
+  // запрос запускает реальный вызов, а все, что пришли, пока он не завершён,
+  // просто подписываются на его результат вместо того, чтобы порождать
+  // свой собственный.
+  if (healthInFlight) { healthInFlight.push(cb); return; }
+  healthInFlight = [cb];
+
   runClaude({ system: '', prompt: 'Ответь одним словом: ок' }, 30000, (err) => {
     const value = err ? { status: 'stale', bin, reason: err.message.slice(0, 200) } : { status: 'ok', bin };
     healthCache = { at: Date.now(), value };
-    cb(value);
+    const waiters = healthInFlight;
+    healthInFlight = null;
+    waiters.forEach((waiter) => waiter(value));
   });
 }
 
@@ -116,11 +156,34 @@ const server = http.createServer((req, res) => {
     let payload;
     try { payload = JSON.parse(body || '{}'); } catch { return send(400, { error: 'тело не разобрано как JSON' }); }
 
+    let responded = false; // ответ уже отправлен клиенту
+    let aborted = false;   // клиент оборвал соединение раньше, чем мы ответили
+    let child = null;      // текущий порождённый процесс claude (если уже запущен)
+
+    // Если сайт оборвал соединение (например, по собственному таймауту), а
+    // ответ ещё не ушёл — порождённый claude без этого обработчика молотит
+    // до TIMEOUT (по умолчанию 180с), удерживая слот ограничителя и тратя
+    // лимит подписки на результат, который никому уже не нужен. При
+    // maxConcurrent=2 несколько таких обрывов подряд забивают очередь живым
+    // запросам на минуты — ровно то, от чего ограничитель должен защищать.
+    // 'close' у res срабатывает и в штатном случае — после res.end(), — но
+    // тогда responded уже true, и мы ничего не делаем: убивать нечего.
+    res.on('close', () => {
+      if (responded) return;
+      aborted = true;
+      if (child) child.kill('SIGTERM');
+    });
+
     limiter.run(() => new Promise((resolve, reject) => {
-      runClaude(payload, TIMEOUT, (err, out) => (err ? reject(err) : resolve(out)));
+      // Соединение уже оборвано, пока запрос ждал своей очереди в
+      // ограничителе, — процесс ещё не порождён, и порождать его сейчас
+      // означало бы тратить лимит подписки и слот на заведомо ненужный
+      // результат.
+      if (aborted) return reject(Object.assign(new Error('клиент отключился до запуска'), { code: 'ABORTED' }));
+      child = runClaude(payload, TIMEOUT, (err, out) => (err ? reject(err) : resolve(out)));
     })).then(
-      (out) => { markAlive(); send(200, out); },
-      (err) => send(err.code === 'BUSY' ? 503 : 502, { error: err.message }),
+      (out) => { responded = true; markAlive(); send(200, out); },
+      (err) => { responded = true; if (!aborted) send(err.code === 'BUSY' ? 503 : 502, { error: err.message }); },
     );
   });
 });
