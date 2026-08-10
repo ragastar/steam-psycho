@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { generateImageUrl } from "./providers/wiro";
 
 export interface ArtResult {
   imageUrl: string | null;
@@ -7,12 +8,12 @@ export interface ArtResult {
   cached: boolean;
 }
 
-// OpenRouter image generation via chat completions
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const IMAGE_MODEL = "google/gemini-2.5-flash-image";
-
-// Persistent storage: /data/art in production (Docker volume), local fallback for dev
+// Persistent storage: /data/art в проде (том Docker), локальная папка в разработке
 const ART_DIR = process.env.ART_STORAGE_PATH || path.join(process.cwd(), "data", "art");
+
+// Картинка карточки — около мегабайта. Больше пары мегабайт быть не должно,
+// и принимать что-то большое с чужого CDN на диск не стоит.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 export function getArtFilePath(steamId64: string): string {
   return path.join(ART_DIR, `${steamId64}.png`);
@@ -22,73 +23,55 @@ export function artFileExists(steamId64: string): boolean {
   return fs.existsSync(getArtFilePath(steamId64));
 }
 
-interface OpenRouterImageResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-      images?: Array<{
-        type: string;
-        image_url: { url: string };
-      }>;
-    };
-  }>;
+async function downloadToDisk(url: string, filePath: string): Promise<boolean> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error(`[art] скачивание не удалось (${res.status})`);
+      return false;
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.byteLength === 0) {
+      console.error("[art] пришёл пустой файл");
+      return false;
+    }
+    if (buffer.byteLength > MAX_IMAGE_BYTES) {
+      console.error(`[art] файл слишком большой: ${buffer.byteLength} байт`);
+      return false;
+    }
+
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, buffer);
+    return true;
+  } catch (err) {
+    console.error("[art] скачивание упало:", err);
+    return false;
+  }
 }
 
 export async function generateArtImage(
   steamId64: string,
   imagePrompt: string,
 ): Promise<ArtResult> {
-  // Check if file already exists on disk
+  // Уже сгенерированное лежит на диске — второй раз не платим.
   if (artFileExists(steamId64)) {
     return { imageUrl: `/api/art/image/${steamId64}`, prompt: imagePrompt, cached: true };
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.error("Art generation: OPENAI_API_KEY not set");
+  const t0 = Date.now();
+  const remoteUrl = await generateImageUrl(imagePrompt);
+  if (!remoteUrl) {
     return { imageUrl: null, prompt: imagePrompt, cached: false };
   }
 
-  try {
-    const res = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_BASE_URL || "https://gamertype.fun",
-        "X-Title": "GamerType",
-      },
-      body: JSON.stringify({
-        model: IMAGE_MODEL,
-        messages: [{ role: "user", content: imagePrompt }],
-        modalities: ["image", "text"],
-      }),
-    });
+  // Кладём файл к себе: ссылка в CDN поставщика живёт не вечно.
+  const saved = await downloadToDisk(remoteUrl, getArtFilePath(steamId64));
+  console.log(`[art] ${steamId64} картинка за ${Date.now() - t0}ms, сохранена: ${saved}`);
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`Art generation failed (${res.status}):`, errText);
-      return { imageUrl: null, prompt: imagePrompt, cached: false };
-    }
-
-    const data: OpenRouterImageResponse = await res.json();
-    const imageDataUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!imageDataUrl) {
-      console.error("Art generation: no image in response");
-      return { imageUrl: null, prompt: imagePrompt, cached: false };
-    }
-
-    // Extract base64 from data URL and save to disk
-    const base64Match = imageDataUrl.match(/^data:image\/\w+;base64,(.+)$/);
-    if (base64Match) {
-      fs.mkdirSync(ART_DIR, { recursive: true });
-      fs.writeFileSync(getArtFilePath(steamId64), Buffer.from(base64Match[1], "base64"));
-    }
-
-    return { imageUrl: `/api/art/image/${steamId64}`, prompt: imagePrompt, cached: false };
-  } catch (err) {
-    console.error("Art generation failed:", err);
+  if (!saved) {
     return { imageUrl: null, prompt: imagePrompt, cached: false };
   }
+
+  return { imageUrl: `/api/art/image/${steamId64}`, prompt: imagePrompt, cached: false };
 }
