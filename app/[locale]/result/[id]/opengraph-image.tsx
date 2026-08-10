@@ -5,6 +5,7 @@ import { portraitKey, profileKey } from "@/lib/cache/keys";
 import type { CardPortrait } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 import { getRarityTheme } from "@/lib/card/styles";
+import { SITE_HOST } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const alt = "GamerType Card";
@@ -162,7 +163,7 @@ export default async function OgImage({ params: rawParams }: { params: Promise<{
               <span>{profile.stats.totalPlaytimeHours}h</span>
               <span>Spirit: {stripEmoji(portrait.spirit_game)}</span>
             </div>
-            <div style={{ fontSize: "16px", color: theme.accentColor, fontWeight: 600 }}>gamertype.fun</div>
+            <div style={{ fontSize: "16px", color: theme.accentColor, fontWeight: 600 }}>{SITE_HOST}</div>
           </div>
         </div>
       ),

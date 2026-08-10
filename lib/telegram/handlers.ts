@@ -4,6 +4,7 @@ import { getBot } from "./bot";
 import { getCache, setCache } from "@/lib/cache/redis";
 import { CACHE_TTL, gateTokenKey } from "@/lib/cache/keys";
 import { logGateEvent } from "@/lib/analytics/db";
+import { SITE_HOST } from "@/lib/site";
 
 interface GateData {
   steamId64: string;
@@ -32,13 +33,13 @@ const WELCOME = `🎮 GamerType — AI-психоанализ по библио�
 → Разблокирую твою карточку
 
 Как получить карточку:
-1. Заходи на gamertype.fun
+1. Заходи на ${SITE_HOST}
 2. Вставь ссылку на Steam-профиль
 3. Подпишись на @gamertyper
 4. Получи результат!
 
 Канал: @gamertyper
-Сайт: gamertype.fun`;
+Сайт: ${SITE_HOST}`;
 
 const MESSAGES = {
   ru: {

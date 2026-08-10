@@ -12,6 +12,7 @@ import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
 import { getAccessLevel } from "@/lib/access/entitlement";
 import { toTeaserProfile } from "@/lib/access/redact";
+import { SITE_URL } from "@/lib/site";
 
 interface Props {
   // В Next 15+ параметры маршрута приходят промисом.
@@ -22,7 +23,6 @@ export async function generateMetadata({ params: rawParams }: Props): Promise<Me
   const params = await rawParams;
   const portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://gamertype.fun";
 
   if (!portrait || !profile) {
     return { title: "GamerType" };
@@ -37,7 +37,7 @@ export async function generateMetadata({ params: rawParams }: Props): Promise<Me
     openGraph: {
       title,
       description,
-      images: [`${baseUrl}/${params.locale}/result/${params.id}/opengraph-image`],
+      images: [`${SITE_URL}/${params.locale}/result/${params.id}/opengraph-image`],
       type: "website",
     },
     twitter: {
