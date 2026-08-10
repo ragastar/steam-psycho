@@ -17,6 +17,8 @@
 - Промпт передаётся `claude` **через stdin**, не аргументом: текст с дефиса в начале иначе принимается за флаг.
 - Мост запускается с `--allowedTools ''` — только текст, никаких действий.
 - Проверка живости **только по запросу, никогда по расписанию**: каждый вызов тратит лимит подписки.
+- **Каждый вызов моста несёт ~21 500 токенов ввода собственного контекста Claude Code** — это до нашего промпта. Измерено 2026-08-10; отключение MCP и чистый рабочий каталог не помогают (21 439 против 21 540). Уменьшить нечем, но об этом надо помнить при оценке лимита.
+- **Модель задаётся явно** (`--model`), по умолчанию `sonnet`. Подписка сама отдаёт Opus 4.8 с окном в миллион токенов — для карточки избыточно и быстро съедает лимит Max. Образец в projectlevin модель не пробрасывает; здесь это исправлено.
 - Комментарии, коммиты и сообщения об ошибках — на русском (конвенция репозитория).
 - В `GenerationResult.provider` пишется тот, кто **реально** отработал, — поле идёт в статистику.
 - Ограничения доступа (`DISABLE_GATE`, потолок генераций) в этой работе **не трогаем** — решение владельца.
@@ -231,6 +233,11 @@ const HOST = process.env.BRIDGE_HOST || '127.0.0.1';
 const TOKEN = process.env.BRIDGE_TOKEN || '';
 const TIMEOUT = Number(process.env.BRIDGE_TIMEOUT_MS || 180000);
 const HEALTH_TTL = Number(process.env.BRIDGE_HEALTH_TTL_MS || 60000);
+// Подписка по умолчанию отдаёт Opus 4.8 с окном в миллион токенов — для
+// карточки это избыточно, а лимит Max он ест соответственно. Sonnet измерен
+// на этой же машине и справляется. Образец в projectlevin модель не
+// пробрасывает вообще, из-за чего всё идёт на самой тяжёлой.
+const MODEL = process.env.BRIDGE_MODEL || 'sonnet';
 
 const limiter = createLimiter({
   maxConcurrent: Number(process.env.BRIDGE_MAX_CONCURRENT || 2),
@@ -257,7 +264,7 @@ function runClaude({ system, prompt }, timeoutMs, cb) {
   // Промпт через stdin, а не аргументом: текст, начинающийся с дефиса
   // (например markdown-разделитель), claude принимает за флаг и падает.
   // Плюс нет предела длины аргументов.
-  const args = ['-p', '--output-format', 'json', '--allowedTools', ''];
+  const args = ['-p', '--output-format', 'json', '--allowedTools', '', '--model', MODEL];
   if (system) args.push('--append-system-prompt', String(system));
 
   // CLAUDECODE выставлен, если мост запущен из сессии Claude Code — вложенный
@@ -1069,6 +1076,7 @@ BRIDGE_MAX_CONCURRENT=${BRIDGE_MAX_CONCURRENT:-2}
 BRIDGE_QUEUE_MAX=${BRIDGE_QUEUE_MAX:-4}
 BRIDGE_TIMEOUT_MS=${BRIDGE_TIMEOUT_MS:-180000}
 BRIDGE_HEALTH_TTL_MS=${BRIDGE_HEALTH_TTL_MS:-60000}
+BRIDGE_MODEL=${BRIDGE_MODEL:-sonnet}
 EOF
 echo "✓ $ENV_FILE (шлюз $HOST_IP, порт $PORT)"
 
@@ -1166,21 +1174,15 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Files:** изменений в репозитории нет.
 
-- [ ] **Шаг 1: Восстановить сессию подписки**
+- [x] **Шаг 1: Восстановить сессию подписки — СДЕЛАНО 2026-08-10**
 
-Выполняет владелец на сервере, в обычном терминале (не внутри сессии Claude Code):
-
-```bash
-claude login
-```
-
-Проверить, что генерация вообще пошла:
+Вход выполнен владельцем через `/login` (со слэшем: без него текст уходит агенту как задача и возвращает 401). Проверено:
 
 ```bash
-echo 'Ответь одним словом: ок' | claude -p --output-format json --allowedTools ''
+env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT bash -c "echo 'Ответь одним словом: ок' | claude -p --output-format json --allowedTools ''"
 ```
 
-Ожидается: JSON с полем `result`. Если снова тишина — записать наблюдение и остановиться: без живой сессии моста нет, но сайт при этом продолжает работать на запасном ключе.
+Ответ за 1,8 с, модель `claude-opus-4-8[1m]` (поэтому в мосте задан `--model sonnet`). Если мост однажды замолчит — первым делом смотреть срок годности в `/root/.claude/.credentials.json`: истёкший токен проявляется тишиной, а не ошибкой.
 
 - [ ] **Шаг 2: Поставить мост**
 
