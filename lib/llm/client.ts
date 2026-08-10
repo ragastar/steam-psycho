@@ -16,8 +16,13 @@ export interface LLMConfig {
 }
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
-  // Модель определяет подписка, своего значения у моста нет.
-  "claude-bridge": "subscription",
+  // Должно совпадать с BRIDGE_MODEL в tools/llm-bridge/server.mjs и с
+  // умолчанием в deploy/llm-bridge-setup.sh. Раньше здесь стояло
+  // "subscription" — красиво, но неверно: getAvailableProviders() показывал
+  // в админке «модель subscription», хотя карточки на самом деле делает
+  // claude-sonnet-5. Реальную отработавшую модель мост возвращает в ответе,
+  // и она приоритетнее этого умолчания.
+  "claude-bridge": "claude-sonnet-5",
   // Должно совпадать с DEFAULT_MODEL в providers/anthropic.ts,
   // иначе статистика и админка покажут не ту модель, что отработала.
   anthropic: "claude-opus-5",
