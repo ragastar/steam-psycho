@@ -91,6 +91,10 @@ export default async function ResultPage({ params: rawParams }: Props) {
             steamId64={params.id}
             locale={params.locale}
             rarity={cachedRarity}
+            /* Сюда попадаем только когда доступ уже разрешён (ветка выше
+               перехватывает отсутствие доступа). Значит замок рисовать
+               нельзя — витрина здесь работает как экран ожидания. */
+            accessGranted
           />
         </div>
       );

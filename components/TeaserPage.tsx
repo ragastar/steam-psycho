@@ -15,6 +15,11 @@ interface TeaserPageProps {
   steamId64: string;
   locale: string;
   rarity: Rarity;
+  /**
+   * Доступ разрешён сервером, карточка просто ещё не сгенерирована.
+   * Витрина в этом случае показывается как экран ожидания, а не как замок.
+   */
+  accessGranted?: boolean;
 }
 
 const RARITY_BORDER: Record<Rarity, string> = {
@@ -41,7 +46,7 @@ const FEATURES = [
   { icon: "\uD83D\uDCCA", key: "feature5" },
 ] as const;
 
-export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPageProps) {
+export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted = false }: TeaserPageProps) {
   const t = useTranslations();
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -207,7 +212,12 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <TelegramGate steamId64={steamId64} locale={locale} onUnlock={handleUnlock} />
+          <TelegramGate
+            steamId64={steamId64}
+            locale={locale}
+            onUnlock={handleUnlock}
+            accessGranted={accessGranted}
+          />
         </motion.div>
       </div>
     </div>

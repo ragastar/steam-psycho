@@ -9,6 +9,18 @@ interface TelegramGateProps {
   locale: string;
   children?: React.ReactNode;
   onUnlock?: () => void;
+  /**
+   * Доступ уже разрешён сервером — замок рисовать не нужно.
+   *
+   * Раньше здесь читался NEXT_PUBLIC_DISABLE_GATE, и это давало расхождение:
+   * сервер по DISABLE_GATE пускал к полному результату, а браузер по своему
+   * (пустому) флагу продолжал требовать подписку. Посетитель видел замок при
+   * полностью открытом доступе, и обойти это можно было только пересборкой
+   * образа — браузерные переменные вшиваются на этапе сборки.
+   *
+   * Решение о доступе одно, принимает его сервер и передаёт сюда.
+   */
+  accessGranted?: boolean;
 }
 
 const LS_PREFIX = "gate:";
@@ -16,10 +28,9 @@ const POLL_INTERVAL = 3000;
 // Имя бота больше не зашито в код: при смене бренда ссылка вела бы в никуда.
 const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT || "gamertype_bot";
 
-export function TelegramGate({ steamId64, locale, children, onUnlock }: TelegramGateProps) {
+export function TelegramGate({ steamId64, locale, children, onUnlock, accessGranted = false }: TelegramGateProps) {
   const t = useTranslations("gate");
-  const gateDisabled = process.env.NEXT_PUBLIC_DISABLE_GATE === "true";
-  const [unlocked, setUnlocked] = useState(gateDisabled);
+  const [unlocked, setUnlocked] = useState(accessGranted);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
