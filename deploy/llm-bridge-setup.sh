@@ -30,16 +30,11 @@ else
   TOKEN="$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32)"
 fi
 
-# Свой домашний каталог для дочернего claude: иначе он подхватит плагины,
-# навыки и хук старта сессии владельца из /root/.claude (см. Task 6, шаг 0
-# в tools/llm-bridge/server.mjs). Авторизацию КОПИРУЕМ, а не связываем
-# ссылкой — поэтому после `claude /login` у владельца её надо скопировать
-# заново, повторный запуск этого скрипта делает это сам. Если мост однажды
-# начнёт отвечать status=stale, а `claude` у владельца работает нормально,
-# первым делом проверь именно это.
-BRIDGE_HOME="${BRIDGE_HOME:-/var/lib/gamertype-bridge}"
-install -d -m 700 "$BRIDGE_HOME/.claude"
-install -m 600 /root/.claude/.credentials.json "$BRIDGE_HOME/.claude/.credentials.json"
+# Авторизация подписки НИКУДА не копируется: мост читает /root/.claude
+# владельца напрямую. Копия во втором каталоге протухала бы после каждого
+# входа, мост молча отвечал бы «сессия мертва», а сайт так же молча уходил
+# бы на платный ключ — выглядит как необъяснимая поломка. Решение владельца
+# от 2026-08-10, обоснование в спеке моста.
 
 umask 077
 cat > "$ENV_FILE" <<EOF
@@ -51,7 +46,6 @@ BRIDGE_QUEUE_MAX=${BRIDGE_QUEUE_MAX:-4}
 BRIDGE_TIMEOUT_MS=${BRIDGE_TIMEOUT_MS:-180000}
 BRIDGE_HEALTH_TTL_MS=${BRIDGE_HEALTH_TTL_MS:-60000}
 BRIDGE_MODEL=${BRIDGE_MODEL:-claude-sonnet-5}
-BRIDGE_HOME=$BRIDGE_HOME
 EOF
 echo "✓ $ENV_FILE (шлюз $HOST_IP, порт $PORT)"
 

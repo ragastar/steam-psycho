@@ -11,9 +11,10 @@ User=root
 Environment=HOME=/root
 # Секрет, адрес и потолки — в файле вне репозитория.
 EnvironmentFile=/etc/gamertype-llm-bridge.env
-# HOME остаётся /root: там лежат бинари расширений VS Code, которые резолвит
-# мост. Дочернему процессу claude подставляется отдельный дом через
-# BRIDGE_HOME — см. шаг 0.
+# HOME=/root и для моста, и для дочернего claude: там и бинари расширений
+# VS Code, и живая авторизация подписки. Отдельный дом для дочернего процесса
+# рассматривался и отвергнут — он требовал копии авторизации, а копия
+# протухает после каждого входа.
 ExecStart=/usr/bin/node /opt/steam-psycho/tools/llm-bridge/server.mjs
 Restart=on-failure
 RestartSec=3
