@@ -14,10 +14,12 @@ import { getAccessLevel } from "@/lib/access/entitlement";
 import { toTeaserProfile } from "@/lib/access/redact";
 
 interface Props {
-  params: { id: string; locale: string };
+  // В Next 15+ параметры маршрута приходят промисом.
+  params: Promise<{ id: string; locale: string }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params: rawParams }: Props): Promise<Metadata> {
+  const params = await rawParams;
   const portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://gamertype.fun";
@@ -46,7 +48,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ResultPage({ params }: Props) {
+export default async function ResultPage({ params: rawParams }: Props) {
+  const params = await rawParams;
   const t = await getTranslations();
   let portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));

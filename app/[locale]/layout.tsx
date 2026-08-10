@@ -17,11 +17,14 @@ export const metadata: Metadata = {
 
 export default async function LocaleLayout({
   children,
-  params: { locale },
+  params,
 }: {
   children: React.ReactNode;
-  params: { locale: string };
+  // В Next 15+ параметры маршрута приходят промисом.
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale } = await params;
+
   if (!routing.locales.includes(locale as "ru" | "en")) {
     notFound();
   }

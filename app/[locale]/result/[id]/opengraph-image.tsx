@@ -24,7 +24,8 @@ function stripEmoji(str: string): string {
   return str.replace(/[^\x00-\x7F\u00A0-\u024F\u0400-\u04FF\u2000-\u206F\u2070-\u209F\u20A0-\u20CF\u2100-\u214F]/g, "").trim();
 }
 
-export default async function OgImage({ params }: { params: { id: string; locale: string } }) {
+export default async function OgImage({ params: rawParams }: { params: Promise<{ id: string; locale: string }> }) {
+  const params = await rawParams;
   try {
     const portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
     const profile = await getCache<AggregatedProfile>(profileKey(params.id));

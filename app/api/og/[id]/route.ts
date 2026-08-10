@@ -7,14 +7,15 @@ import type { AggregatedProfile } from "@/lib/aggregation/types";
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const url = new URL(req.url);
   const locale = url.searchParams.get("locale") || "ru";
 
   const [portrait, profile] = await Promise.all([
-    getCache<CardPortrait>(portraitKey(params.id, locale)),
-    getCache<AggregatedProfile>(profileKey(params.id)),
+    getCache<CardPortrait>(portraitKey(id, locale)),
+    getCache<AggregatedProfile>(profileKey(id)),
   ]);
 
   if (!portrait || !profile) {
@@ -26,7 +27,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(png), {
       headers: {
         "Content-Type": "image/png",
-        "Content-Disposition": `attachment; filename="gamertype-${params.id}.png"`,
+        "Content-Disposition": `attachment; filename="gamertype-${id}.png"`,
         "Cache-Control": "public, max-age=86400",
       },
     });
