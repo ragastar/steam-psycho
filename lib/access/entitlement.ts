@@ -46,7 +46,9 @@ export function issueAccessCookie(steamId64: string): {
     value: `${expiresAt}.${sign(steamId64, expiresAt)}`,
     options: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      // По HTTP браузер молча отбрасывает куку с Secure, поэтому для зеркала
+      // на голом IP нужен явный тумблер. Включать только там, где нет TLS.
+      secure: process.env.NODE_ENV === "production" && process.env.ALLOW_INSECURE_COOKIES !== "true",
       sameSite: "lax",
       path: "/",
       maxAge: MAX_AGE,
