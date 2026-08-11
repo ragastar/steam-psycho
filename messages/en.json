@@ -353,5 +353,27 @@
     "codeSubmit": "Sign in with code",
     "codeWrong": "That code didn't work. Check you entered all of it, or get a new one from the bot.",
     "tooMany": "Too many attempts. Wait an hour and try again."
+  },
+  "paywall": {
+    "title": "That was the free part",
+    "subtitle": "You've seen the verdict. Everything else is waiting behind the button — and it's a lot more than a couple of lines.",
+    "whatYouGet": "What you unlock:",
+    "includes": {
+      "roasts": "Five more roasts — one for every sore spot",
+      "psycho": "Big Five psycho profile and six motivation scales",
+      "shadow": "Two shadow archetypes — the parts you don't admit to",
+      "spirit": "Your spirit animal, described, plus your totem game",
+      "art": "AI art of your card",
+      "analytics": "Analytics: library economics, platforms, timeline, ranks"
+    },
+    "buy": "Unlock the full read — {price} ₽",
+    "buying": "Opening checkout...",
+    "disclaimer": "Entertainment, not a psychologist's report. You're buying a joke about yourself, not a diagnosis.",
+    "lockedTitle": "Locked from here on",
+    "lockedHint": "There are no real words down here on purpose — they show up once you pay.",
+    "loginHint": "Sign in so the purchase sticks. It's tied to your account, not to this browser.",
+    "alreadyOwned": "You already own this read — refreshing the page.",
+    "failed": "Couldn't start the payment. Give it another go.",
+    "unavailable": "Payments are switched off right now — nothing to buy here."
   }
 }

@@ -10,6 +10,7 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
+import { FreeResult } from "@/components/FreeResult";
 import { getAccessLevel } from "@/lib/access/entitlement";
 import { toTeaserProfile } from "@/lib/access/redact";
 import { toFreePortrait } from "@/lib/access/redact-portrait";
@@ -76,37 +77,11 @@ export default async function ResultPage({ params: rawParams }: Props) {
   const currentAccountId = await getCurrentAccountId();
   const isOwner = currentAccountId ? accountOwnsSteamId(currentAccountId, params.id) : false;
 
-  if (access !== "full" && profile) {
-    // Единственная дверь наружу без доступа: платного текста в этом объекте уже
-    // нет — не «размыт», а отсутствует (lib/access/redact-portrait). Сегодня
-    // витрина берёт отсюда только редкость; сами блоки карточки с пустышками
-    // под размытием подключает следующая задача плана.
-    const free = portrait ? toFreePortrait(portrait) : null;
-    // Редкость карточки надёжнее отдельного кеша: он живёт меньше портрета, и
-    // после его протухания витрина показывала бы «common» на легендарной карте.
-    const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
-    return (
-      <div className="min-h-screen">
-        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
-          {isOwner && (
-            <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
-              {t("result.yourProfile")}
-            </span>
-          )}
-          <LocaleSwitcher />
-        </div>
-        <TeaserPage
-          profile={toTeaserProfile(profile)}
-          steamId64={params.id}
-          locale={params.locale}
-          rarity={free?.rarity ?? cachedRarity ?? "common"}
-        />
-      </div>
-    );
-  }
-
-  // Доступ есть, но портрет ещё не сгенерирован — показываем ту же витрину,
-  // она сама запустит генерацию.
+  // Портрета ещё нет — витрина ожидания, она же запускает генерацию. Ветка
+  // стоит ПЕРВОЙ и не смотрит на доступ: генерация бесплатна, платной является
+  // только часть готовой карточки. Раньше здесь первым делом отсекали тех, у
+  // кого доступа нет, и при включённой кассе они не получали ни карточки, ни
+  // кнопки — тупик, из-за которого продавать было нечего.
   if (!portrait && profile) {
     const cachedStats = await getCache<CardStats>(cardStatsKey(params.id));
     const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
@@ -126,10 +101,6 @@ export default async function ResultPage({ params: rawParams }: Props) {
             steamId64={params.id}
             locale={params.locale}
             rarity={cachedRarity}
-            /* Сюда попадаем только когда доступ уже разрешён (ветка выше
-               перехватывает отсутствие доступа). Значит замок рисовать
-               нельзя — витрина здесь работает как экран ожидания. */
-            accessGranted
           />
         </div>
       );
@@ -159,6 +130,24 @@ export default async function ResultPage({ params: rawParams }: Props) {
           </a>
         </div>
       </div>
+    );
+  }
+
+  // Карточка есть, права на неё нет — бесплатный вид с витриной покупки.
+  //
+  // Наружу уезжают ТОЛЬКО урезанные объекты. Полные `portrait` и `profile` в
+  // этот компонент передать нельзя даже случайно: он их типов не принимает, а
+  // закрытых полей в `FreePortrait`/`TeaserProfile` нет вовсе — платный текст
+  // не «размыт», а отсутствует.
+  if (access !== "full") {
+    return (
+      <FreeResult
+        free={toFreePortrait(portrait)}
+        profile={toTeaserProfile(profile)}
+        steamId64={params.id}
+        locale={params.locale}
+        isOwner={isOwner}
+      />
     );
   }
 

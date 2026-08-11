@@ -15,11 +15,6 @@ interface TeaserPageProps {
   steamId64: string;
   locale: string;
   rarity: Rarity;
-  /**
-   * Доступ разрешён сервером, карточка просто ещё не сгенерирована.
-   * Витрина в этом случае показывается как экран ожидания, а не как замок.
-   */
-  accessGranted?: boolean;
 }
 
 const RARITY_BORDER: Record<Rarity, string> = {
@@ -46,7 +41,7 @@ const FEATURES = [
   { icon: "\uD83D\uDCCA", key: "feature5" },
 ] as const;
 
-export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted = false }: TeaserPageProps) {
+export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPageProps) {
   const t = useTranslations();
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -84,22 +79,22 @@ export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted =
     }
   }, [steamId64, locale, router]);
 
-  // Доступ уже разрешён сервером, а карточки ещё нет — запускаем генерацию
-  // сами, иначе посетитель навсегда застревает на витрине: раньше генерацию
-  // запускал ТОЛЬКО момент разблокировки гейта, а при открытом доступе гейта
-  // нет и запускать некому.
+  // Карточки ещё нет — запускаем генерацию сами и сразу, безо всяких условий:
+  // генерация бесплатна (платной является только часть готовой карточки), а
+  // сюда страница присылает ровно тех, у кого портрета нет. Раньше запуск
+  // стоял за флагом доступа, и при включённой кассе посетитель без права
+  // застревал на витрине навсегда — не увидев ни карточки, ни кнопки.
   //
   // Именно в эффекте, а не в теле отрисовки: прежний автозапуск стоял в теле
   // и мог сработать несколько раз за один рендер — каждый раз оплачиваемым
   // вызовом. startedRef внутри triggerGeneration страхует от повтора, в том
   // числе от двойного прогона эффектов в строгом режиме разработки.
   useEffect(() => {
-    // Каскадный рендер тут — не побочный эффект, а сама цель: увидев открытый
-    // доступ, сразу показываем крутилку и уходим в сеть за генерацией, вместо
-    // лишнего кадра с витриной.
+    // Каскадный рендер тут — не побочный эффект, а сама цель: сразу показываем
+    // крутилку и уходим в сеть за генерацией, вместо лишнего кадра с витриной.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (accessGranted) triggerGeneration();
-  }, [accessGranted, triggerGeneration]);
+    triggerGeneration();
+  }, [triggerGeneration]);
 
   const borderClass = RARITY_BORDER[rarity];
   const badgeClass = RARITY_BADGE_BG[rarity];
@@ -256,8 +251,9 @@ export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted =
         {/*
           Здесь стоял замок «подпишись на Telegram-канал». Гейт на подписку
           отменён как способ открыть разбор (решение владельца 2026-08-10):
-          второй бесплатный путь означал бы, что платить незачем. Кнопку
-          покупки на это место ставит следующая задача плана.
+          второй бесплатный путь означал бы, что платить незачем. Кнопки
+          покупки здесь нет намеренно: пока карточки не существует, покупать
+          нечего — витрина покупки живёт на готовом разборе (FreeResult).
         */}
       </div>
     </div>

@@ -7,7 +7,6 @@ import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
 import { getClientIp } from "@/lib/http/client-ip";
-import { getAccessLevel } from "@/lib/access/entitlement";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 import type { CardStats } from "@/lib/aggregation/aggregate";
 import type { Rarity } from "@/lib/llm/types";
@@ -39,14 +38,18 @@ export async function POST(req: Request) {
       );
     }
 
-    // Доступ проверяется ЗДЕСЬ, а не в компоненте перед вызовом.
-    // Раньше эта точка генерировала платный портрет любому, кто знает Steam ID.
-    if ((await getAccessLevel(steamId64)) !== "full") {
-      return NextResponse.json(
-        { error: true, code: "ACCESS_REQUIRED", message: "Портрет ещё не открыт" },
-        { status: 403 },
-      );
-    }
+    // Проверки доступа здесь НЕТ намеренно: генерация бесплатна.
+    //
+    // Она тут стояла и запирала сама себя. При включённой кассе портрет не
+    // создавался ни у кого, кроме уже заплативших, — а платить было не за что,
+    // потому что бесплатного вердикта никто никогда не видел. Спека требует
+    // обратного порядка: сначала разбор и генерация, потом деньги.
+    //
+    // Защита, ради которой проверку ставили («платный портрет уезжает любому,
+    // кто знает Steam ID»), теперь надёжнее: платного текста в браузере нет
+    // вовсе, его вырезает toFreePortrait на сервере. Расход ограничен лимитом
+    // по IP выше и требованием, чтобы профиль уже лежал в кеше (иначе
+    // DATA_EXPIRED ниже). Арт остаётся платным — там проверка на месте.
 
     const ipHash = hashIp(ip);
 
