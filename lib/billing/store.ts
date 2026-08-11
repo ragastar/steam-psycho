@@ -127,15 +127,25 @@ export function findOpenOrder(accountId: number, steamId64: string): Order | nul
 }
 
 /**
- * Подтверждение оплаты от кассы. Ключевое требование — идемпотентность в
- * одной транзакции: проверка статуса, перевод заказа в paid и вставка права
- * должны быть неделимы. Вебхуки от касс приходят по два штатно; без единой
- * транзакции два одновременных подтверждения могли бы оба увидеть
- * status = 'created' и оба выдать право.
+ * Подтверждение оплаты от кассы. Вебхуки от касс приходят по два штатно —
+ * второй вызов для уже подтверждённого заказа должен отвечать "already" и
+ * ничего не менять, а не выдавать второе право.
  *
- * Заказ не в статусе 'created' (уже 'paid' или 'cancelled') второе право не
- * получает — второй вызов для того же платежа отвечает "already" и ничего
- * не меняет.
+ * Единственные ворота идемпотентности — сам условный UPDATE
+ * (`WHERE id = ? AND status = 'created'`) и его `changes`, а не более
+ * раннее чтение статуса: если изменилась ровно одна строка — заказ только
+ * что перешёл в paid именно этим вызовом, и только этот вызов вставляет
+ * право. Если ноль — заказ либо не найден, либо уже не в 'created' (payload
+ * условие в UPDATE не даёт двум вызовам одновременно решить, что "created"
+ * ещё они). Внутри одного процесса better-sqlite3 синхронен и второй вызов
+ * markPaid физически не может начаться, пока не завершится первый — но
+ * ворота одни и в сценарии нескольких процессов на одном файле базы
+ * (несколько воркеров), где чтение вне записи ничего не гарантирует.
+ *
+ * "granted" означает «этот вызов подтвердил заказ», а не «именно сейчас
+ * появилась строка в entitlements»: если право на этот (accountId, steamId)
+ * уже стоит от другого заказа (см. INSERT OR IGNORE ниже), ответ всё равно
+ * "granted" — заказ реально оплачен и переведён в paid.
  */
 export function markPaid(orderId: number, providerOrderId: string): "granted" | "already" | "unknown" {
   const db = getBillingDb();
@@ -143,19 +153,13 @@ export function markPaid(orderId: number, providerOrderId: string): "granted" | 
 
   const attempt = db.transaction((): "granted" | "already" | "unknown" => {
     const row = db
-      .prepare("SELECT account_id, steam_id64, status FROM orders WHERE id = ?")
-      .get(orderId) as { account_id: number; steam_id64: string; status: OrderStatus } | undefined;
+      .prepare("SELECT account_id, steam_id64 FROM orders WHERE id = ?")
+      .get(orderId) as { account_id: number; steam_id64: string } | undefined;
 
     if (!row) return "unknown";
-    if (row.status !== "created") return "already";
 
     const now = Math.floor(Date.now() / 1000);
 
-    // Условие status = 'created' в самом UPDATE — не косметика: прочитанный
-    // выше row.status может к моменту записи устареть, если второй писатель
-    // проскочил ту же проверку раньше нас. Настоящий контроль гонки — здесь,
-    // на самой записи: если ноль строк изменилось, право уже выдал кто-то
-    // другой в этой же транзакции раньше, и это тоже "already".
     const updated = db
       .prepare("UPDATE orders SET status = 'paid', provider_order_id = ?, paid_at = ? WHERE id = ? AND status = 'created'")
       .run(providerOrderId, now, orderId);
@@ -163,8 +167,9 @@ export function markPaid(orderId: number, providerOrderId: string): "granted" | 
     if (updated.changes === 0) return "already";
 
     // OR IGNORE: право на этот steamId у аккаунта уже может быть (куплено
-    // раньше другим заказом) — тогда заказ всё равно переходит в paid, но
-    // вторую строку права заводить незачем.
+    // раньше другим заказом) — тогда insert молча отбрасывается, вторую
+    // строку права заводить незачем, а функция всё равно отвечает "granted"
+    // (см. комментарий над функцией).
     db.prepare(
       `INSERT OR IGNORE INTO entitlements (account_id, steam_id64, source, order_id, expires_at, created_at)
        VALUES (?, ?, 'purchase', ?, NULL, ?)`,

@@ -162,6 +162,31 @@ describe("хранилище заказов и прав", () => {
     expect(billing.hasEntitlement(accountId, "11111111111111111")).toBe(false);
   });
 
+  it("createOrder с несуществующим accountId на живой базе не создаёт заказ", async () => {
+    const { billing } = await freshStores(dbPath);
+
+    // accounts пуст — 999999 не существует. FK (foreign_keys = ON,
+    // унаследовано из identity/db.ts) должен отклонить вставку, а не
+    // молча завести заказ на несуществующий аккаунт.
+    const created = billing.createOrder({
+      accountId: 999999,
+      steamId64: "76561197990915489",
+      amountKop: 19900,
+      provider: "stub",
+      idempotencyKey: "order-fk",
+    });
+
+    expect(created).toBeNull();
+
+    const raw = new Database(dbPath);
+    try {
+      const row = raw.prepare("SELECT COUNT(*) AS n FROM orders").get() as { n: number };
+      expect(row.n).toBe(0);
+    } finally {
+      raw.close();
+    }
+  });
+
   it("findOpenOrder находит незакрытый заказ и не видит оплаченный", async () => {
     const { identity, billing } = await freshStores(dbPath);
     const accountId = makeAccount(identity);
@@ -201,5 +226,29 @@ describe("недоступная база закрывает доступ, а н
     expect(billing.markPaid(1, "provider-order-1")).toBe("unknown");
     expect(billing.hasEntitlement(1, "76561197990915489")).toBe(false);
     expect(billing.findOpenOrder(1, "76561197990915489")).toBeNull();
+  });
+});
+
+describe("миграция может упасть даже на открывшейся базе", () => {
+  it("getBillingDb() ловит исключение из db.exec и возвращает null, а не бросает", async () => {
+    process.env.IDENTITY_DB_PATH = dbPath;
+    vi.resetModules();
+    // База открывается штатно (identity/db.ts это уже сделал успешно) — беда
+    // именно в самой миграции billing-таблиц, а не в открытии файла. Это
+    // сценарий, который "недоступная база" (несуществующий каталог) не
+    // покрывает: там exec никогда не вызывается, потому что открытие
+    // падает раньше.
+    const identityDb = await import("@/lib/identity/db");
+    const billingDb = await import("@/lib/billing/db");
+
+    const opened = identityDb.getIdentityDb();
+    expect(opened).not.toBeNull();
+    const execSpy = vi.spyOn(opened!, "exec").mockImplementation(() => {
+      throw new Error("миграция специально сломана для теста");
+    });
+
+    expect(billingDb.getBillingDb()).toBeNull();
+
+    execSpy.mockRestore();
   });
 });
