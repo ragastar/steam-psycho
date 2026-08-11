@@ -19,7 +19,7 @@ export default function Sidebar() {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 p-4">
       <Link href="/admin" className="mb-8 text-lg font-bold text-white">
-        GamerType
+        Задротометр
         <span className="ml-2 text-xs text-zinc-500">admin</span>
       </Link>
       <nav className="flex flex-col gap-1">

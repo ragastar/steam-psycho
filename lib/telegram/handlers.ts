@@ -26,7 +26,7 @@ async function checkSubscription(
   return ["member", "administrator", "creator"].includes(retry.status);
 }
 
-const WELCOME = `🎮 GamerType — AI-психоанализ по библиотеке Steam.
+const WELCOME = `🎮 Задротометр — разбор по библиотеке Steam.
 
 Что делаю:
 → Подтверждаю подписку на @gamertyper

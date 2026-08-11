@@ -11,7 +11,7 @@ const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel", weight: [
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin", "cyrillic"], variable: "--font-mono", weight: ["400", "700"] });
 
 export const metadata: Metadata = {
-  title: "GamerType — Discover Your Gaming Personality",
+  title: "Задротометр — узнай свой игровой психотип",
   description: "AI personality analysis from your Steam library",
 };
 

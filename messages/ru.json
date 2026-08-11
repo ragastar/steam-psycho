@@ -1,22 +1,21 @@
 {
   "meta": {
-    "title": "GamerType — Узнай свой игровой психотип",
-    "description": "Узнай свой игровой психотип по библиотеке Steam. Развлекательный AI-анализ."
+    "title": "Задротометр — узнай свой игровой психотип",
+    "description": "Узнай свой игровой психотип по библиотеке Steam. Развлекательный разбор, а не диагноз."
   },
   "landing": {
-    "title": "GamerType",
+    "title": "Задротометр",
     "tagline": "Какой ты геймер на самом деле?",
-    "subtitle": "AI проанализирует твою библиотеку Steam и создаст твою коллекционную карточку",
+    "subtitle": "Разберём твою библиотеку Steam по косточкам и соберём коллекционную карточку",
     "inputPlaceholder": "Steam ID, ссылка на профиль или vanity URL",
     "submitButton": "Узнать себя",
-    "aiModel": "AI-модель",
-    "poweredBy": "Работает на {model}",
     "disclaimer": "Развлекательный контент, не настоящий психоанализ",
     "helpToggle": "Где найти свой Steam ID?",
     "helpStep1": "Откройте Steam → ваш профиль",
     "helpStep2": "Скопируйте URL из адресной строки",
     "helpStep3": "Вставьте сюда — подойдёт ссылка, vanity URL или SteamID64",
-    "helpExample": "Например: steamcommunity.com/id/gaben"
+    "helpExample": "Например: steamcommunity.com/id/gaben",
+    "badge": "разбор библиотеки Steam"
   },
   "loading": {
     "step1": "Ищем профиль...",

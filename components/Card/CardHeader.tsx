@@ -108,7 +108,13 @@ export function CardHeader({ portrait, profile, rarityGradient, rarityBorder, st
           />
           <div className="flex-1 min-w-0 pb-1">
             <p className="text-gray-400 text-sm truncate">{profile.player.name}</p>
-            <h1 className="font-cinzel text-xl sm:text-2xl font-bold truncate">
+            {/*
+              Название архетипа переносится, а не обрезается. Оно приходит от
+              модели и бывает длинным: «Дотер-Гегемон На Пенсии» на ширине 360
+              вылезал за экран и терял последнее слово — то есть ровно ту
+              часть, ради которой карточку и открывают.
+            */}
+            <h1 className="font-cinzel text-lg sm:text-2xl font-bold leading-tight break-words">
               <span className={`bg-gradient-to-r ${rarityGradient} bg-clip-text text-transparent`}>
                 {portrait.primaryArchetype.name}
               </span>

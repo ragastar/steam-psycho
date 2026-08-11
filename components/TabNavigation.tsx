@@ -13,19 +13,38 @@ interface TabNavigationProps {
   tabs: Tab[];
   activeTab: string;
   onTabChange: (tabId: string) => void;
+  /**
+   * Уголок справа от вкладок — сюда уезжает переключатель языка.
+   *
+   * Раньше он висел отдельно, поверх страницы (`absolute top-4 right-4 z-30`),
+   * и накрывал собой правую вкладку: на телефоне до неё нельзя было
+   * дотянуться вообще — нажатие всегда попадало в «RU». Поймано проверкой
+   * вёрстки на ширине 390, вручную такое замечаешь, только если ткнёшь именно
+   * в тот угол.
+   */
+  rightSlot?: React.ReactNode;
 }
 
-export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationProps) {
+export function TabNavigation({ tabs, activeTab, onTabChange, rightSlot }: TabNavigationProps) {
   return (
-    <div className="sticky top-0 z-20 bg-gray-950/90 backdrop-blur-md border-b border-gray-700/50">
-      <div className="max-w-3xl mx-auto flex gap-1 p-1.5 relative">
+    <div className="sticky top-0 z-30 bg-gray-950/90 backdrop-blur-md border-b border-gray-700/50">
+      <div className="max-w-3xl mx-auto flex items-center gap-1 p-1.5 relative">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex-1 py-2.5 px-4 text-sm font-medium transition-all duration-200 relative rounded-lg ${
+              /*
+                min-w-0 здесь — главное. Без него flex-1 не позволяет кнопке
+                сжаться уже своего содержимого, и три вкладки распирают строку:
+                замерено на ширине 390 — страница становилась шире экрана на 94
+                пикселя и уезжала вбок целиком, вместе с карточкой.
+
+                Отступы и кегль на телефоне меньше: иначе подписи не влезают
+                даже после того, как сжатие разрешено.
+              */
+              className={`min-w-0 flex-1 py-2.5 px-2 sm:px-4 text-xs sm:text-sm font-medium transition-all duration-200 relative rounded-lg ${
                 isActive
                   ? "text-white"
                   : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/50"
@@ -38,11 +57,13 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
-              <span className="relative z-10 flex items-center justify-center gap-1.5">
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
+              <span className="relative z-10 flex items-center justify-center gap-1 sm:gap-1.5 min-w-0">
+                <span className="shrink-0">{tab.icon}</span>
+                <span className="truncate">{tab.label}</span>
+                {/* Значок «новое» на телефоне прячем: он забирает ширину у
+                    подписи, ради которой вкладка и существует. */}
                 {tab.isNew && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white leading-none">
+                  <span className="hidden sm:inline ml-1 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white leading-none">
                     NEW
                   </span>
                 )}
@@ -57,6 +78,8 @@ export function TabNavigation({ tabs, activeTab, onTabChange }: TabNavigationPro
             </button>
           );
         })}
+
+        {rightSlot && <div className="shrink-0 pl-1">{rightSlot}</div>}
       </div>
     </div>
   );

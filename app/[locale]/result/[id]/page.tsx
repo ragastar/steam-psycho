@@ -12,7 +12,7 @@ import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
 import { getAccessLevel } from "@/lib/access/entitlement";
 import { toTeaserProfile } from "@/lib/access/redact";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, SITE_NAME } from "@/lib/site";
 
 interface Props {
   // В Next 15+ параметры маршрута приходят промисом.
@@ -25,10 +25,10 @@ export async function generateMetadata({ params: rawParams }: Props): Promise<Me
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
 
   if (!portrait || !profile) {
-    return { title: "GamerType" };
+    return { title: SITE_NAME };
   }
 
-  const title = `${profile.player.name} — "${portrait.primaryArchetype.name}" | GamerType`;
+  const title = `${profile.player.name} — "${portrait.primaryArchetype.name}" | ${SITE_NAME}`;
   const description = portrait.quote;
 
   return {
@@ -129,10 +129,9 @@ export default async function ResultPage({ params: rawParams }: Props) {
 
   return (
     <div className="min-h-screen">
-      <div className="absolute top-4 right-4 z-30">
-        <LocaleSwitcher />
-      </div>
-
+      {/* Переключатель языка отрисовывает сама панель вкладок: отдельным
+          плавающим блоком он накрывал правую вкладку, и на телефоне нажать её
+          было нельзя. */}
       <ResultTabs
         portrait={portrait}
         profile={profile}

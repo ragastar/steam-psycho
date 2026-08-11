@@ -5,10 +5,10 @@ import { portraitKey, profileKey } from "@/lib/cache/keys";
 import type { CardPortrait } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 import { getRarityTheme } from "@/lib/card/styles";
-import { SITE_HOST } from "@/lib/site";
+import { SITE_HOST, SITE_NAME } from "@/lib/site";
 
 export const runtime = "nodejs";
-export const alt = "GamerType Card";
+export const alt = "Карточка Задротометра";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -46,7 +46,7 @@ export default async function OgImage({ params: rawParams }: { params: Promise<{
               fontSize: 48,
             }}
           >
-            GamerType
+            {SITE_NAME}
           </div>
         ),
         { ...size },
@@ -89,7 +89,7 @@ export default async function OgImage({ params: rawParams }: { params: Promise<{
                   color: "#fff",
                 }}
               >
-                GT
+                З
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <div style={{ fontSize: "18px", color: "#999" }}>{profile.player.name}</div>
@@ -185,7 +185,7 @@ export default async function OgImage({ params: rawParams }: { params: Promise<{
             fontSize: 48,
           }}
         >
-          GamerType
+          {SITE_NAME}
         </div>
       ),
       { ...size },

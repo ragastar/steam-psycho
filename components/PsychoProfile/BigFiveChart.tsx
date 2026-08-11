@@ -100,10 +100,14 @@ export function BigFiveChart({ bigFive, labels, i18n }: BigFiveChartProps) {
                 <text x={lx} y={ly + 2} textAnchor={anchor} dominantBaseline="middle" className="fill-purple-400 text-[8px] font-bold">
                   {bigFive[key]}
                 </text>
-                {/* Creative label from LLM */}
-                <text x={lx} y={ly + 11} textAnchor={anchor} dominantBaseline="middle" className="fill-gray-500 text-[5.5px] italic">
-                  {labels[key]}
-                </text>
+                {/*
+                  Придуманная моделью подпись («Тильт-машина на максималках»)
+                  здесь больше не рисуется. Она бывает длиннее самой диаграммы
+                  и обрезалась по краям экрана: замерено на ширине 390 —
+                  подписи слева и справа уезжали за границу и читались
+                  наполовину. Полный текст никуда не делся, он в списке под
+                  диаграммой, где есть место для переноса.
+                */}
               </g>
             );
           })}
@@ -114,9 +118,14 @@ export function BigFiveChart({ bigFive, labels, i18n }: BigFiveChartProps) {
       <div className="space-y-3">
         {AXES.map((key) => (
           <div key={key}>
-            <div className="flex justify-between items-baseline mb-1">
-              <span className="text-xs text-gray-400">{i18n[key]}</span>
-              <span className="text-xs text-gray-500 italic truncate ml-2 max-w-[50%] text-right">{labels[key]}</span>
+            {/*
+              Подпись переносится, а не обрезается многоточием: теперь это
+              единственное место, где её видно целиком, а сокращённая
+              «Ачивка-маньяк С Пере…» не значит ничего.
+            */}
+            <div className="flex justify-between items-baseline gap-2 mb-1">
+              <span className="text-xs text-gray-400 shrink-0">{i18n[key]}</span>
+              <span className="text-xs text-gray-500 italic text-right">{labels[key]}</span>
             </div>
             <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
               <div

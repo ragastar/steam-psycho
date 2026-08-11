@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { TabNavigation, TabContainer } from "./TabNavigation";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { CardHeader } from "./Card/CardHeader";
 import { StatsGrid } from "./Card/StatsGrid";
 import { ArchetypeBadges } from "./Card/ArchetypeBadges";
@@ -149,7 +150,14 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
 
   return (
     <div>
-      <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        /* Переключатель языка живёт внутри панели, а не поверх страницы:
+           иначе он накрывает правую вкладку и на телефоне до неё не дотянуться. */
+        rightSlot={<LocaleSwitcher />}
+      />
 
       <div className="max-w-3xl mx-auto px-4 py-6">
         <TabContainer activeTab={activeTab}>

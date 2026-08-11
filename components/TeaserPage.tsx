@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -85,9 +85,18 @@ export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted =
     triggerGeneration();
   }, [triggerGeneration]);
 
-  // Автозапуск при отключённом гейте убран: он стоял прямо в теле отрисовки и
-  // мог сработать несколько раз за один рендер — каждый раз платный вызов.
-  // Отладочный обход теперь серверный (DISABLE_GATE), а не браузерный.
+  // Доступ уже разрешён сервером, а карточки ещё нет — запускаем генерацию
+  // сами, иначе посетитель навсегда застревает на витрине: раньше генерацию
+  // запускал ТОЛЬКО момент разблокировки гейта, а при открытом доступе гейта
+  // нет и запускать некому.
+  //
+  // Именно в эффекте, а не в теле отрисовки: прежний автозапуск стоял в теле
+  // и мог сработать несколько раз за один рендер — каждый раз оплачиваемым
+  // вызовом. startedRef внутри triggerGeneration страхует от повтора, в том
+  // числе от двойного прогона эффектов в строгом режиме разработки.
+  useEffect(() => {
+    if (accessGranted) triggerGeneration();
+  }, [accessGranted, triggerGeneration]);
 
   const borderClass = RARITY_BORDER[rarity];
   const badgeClass = RARITY_BADGE_BG[rarity];
