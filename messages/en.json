@@ -351,10 +351,13 @@
     "signIn": "Sign in",
     "viaTelegram": "With Telegram",
     "viaSteam": "With Steam",
-    "waiting": "Waiting for confirmation in Telegram…",
     "signedIn": "You're signed in",
     "taken": "This login is already linked to another account. Sign in with it, or unlink it there first.",
     "failed": "Sign-in failed. Please try again.",
-    "timedOut": "We didn't get confirmation in time. Tap \"Sign in\" again."
+    "codeHint": "Open the bot — it will send you a code. Enter it here, it works for 10 minutes.",
+    "codeLabel": "Code from the bot",
+    "codeSubmit": "Sign in with code",
+    "codeWrong": "That code didn't work. Check you entered all of it, or get a new one from the bot.",
+    "tooMany": "Too many attempts. Wait an hour and try again."
   }
 }

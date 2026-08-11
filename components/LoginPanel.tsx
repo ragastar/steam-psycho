@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 
 interface Props {
@@ -8,93 +8,60 @@ interface Props {
   onSignedIn?: () => void;
 }
 
+const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT || "gamertype_bot";
+
+/** Ссылка без токена: код придумывает бот, сайт его только принимает. */
+const BOT_LOGIN_URL = `https://t.me/${BOT_USERNAME}?start=login`;
+
+type LoginError = "" | "taken" | "failed" | "codeWrong" | "tooMany";
+
 export function LoginPanel({ onSignedIn }: Props) {
   const t = useTranslations();
   const [accountId, setAccountId] = useState<number | null>(null);
-  const [waiting, setWaiting] = useState(false);
-  const [error, setError] = useState<"" | "taken" | "failed" | "timedOut">("");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Защёлка от двойного клика: закрывается ПЕРВОЙ строкой функции, до
-  // всякого await, — как startedRef в TeaserPage. Если закрывать её после
-  // await (например, вместе с setWaiting), второй клик успевает попасть
-  // в щель между вызовом и первым await и завести собственный setInterval,
-  // который перезапишет pollRef.current и станет недостижим для очистки.
-  const startingRef = useRef(false);
+  const [code, setCode] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<LoginError>("");
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => setAccountId(d.accountId))
       .catch(() => {});
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
   }, []);
 
-  const startTelegram = useCallback(async () => {
-    if (startingRef.current) return;
-    startingRef.current = true;
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (sending) return;
+    setSending(true);
     setError("");
-    setWaiting(true);
 
     try {
-      const res = await fetch("/api/auth/telegram/start", { method: "POST" });
-      if (!res.ok) {
-        setError("failed");
-        setWaiting(false);
-        startingRef.current = false;
+      const res = await fetch("/api/auth/telegram/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+
+      if (res.ok) {
+        const body = await res.json();
+        setAccountId(body.accountId);
+        onSignedIn?.();
         return;
       }
-      const { token, url } = await res.json();
-
-      window.open(url, "_blank", "noopener");
-
-      // Бот подтверждает токен на своей стороне, страница об этом не узнает
-      // сама — поэтому опрашиваем. Пять минут, потом сдаёмся: токен всё равно
-      // живёт десять.
-      let left = 100;
-      pollRef.current = setInterval(async () => {
-        if (left-- <= 0) {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setWaiting(false);
-          // Пять минут прошло — токен ещё жив (TTL 10 минут), но человек
-          // мог закрыть бота или передумать. Отдельный текст, а не общий
-          // "failed": это не сбой запроса, а истечение отведённого времени
-          // ожидания, и объяснить стоит именно это.
-          setError("timedOut");
-          startingRef.current = false;
-          return;
-        }
-        const claim = await fetch("/api/auth/telegram/claim", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
-        });
-        if (claim.status === 409) {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setWaiting(false);
-          setError("taken");
-          startingRef.current = false;
-          return;
-        }
-        if (claim.ok) {
-          if (pollRef.current) clearInterval(pollRef.current);
-          const { accountId } = await claim.json();
-          setWaiting(false);
-          setAccountId(accountId);
-          startingRef.current = false;
-          onSignedIn?.();
-        }
-      }, 3000);
+      // Каждому отказу свой текст: «попробуйте ещё раз» на исчерпанных
+      // попытках — совет прямо противоположный правильному.
+      if (res.status === 409) setError("taken");
+      else if (res.status === 429) setError("tooMany");
+      else if (res.status === 403 || res.status === 400) setError("codeWrong");
+      else setError("failed");
     } catch {
-      // Сетевой сбой на самом старте (офлайн, DNS) — тот же путь, что и
-      // неуспешный ответ сервера: без этого catch падение здесь превращалось
-      // в необработанный отказ промиса без единого слова человеку.
+      // Сетевой сбой (офлайн, DNS) — без этого catch падение здесь было бы
+      // необработанным отказом промиса, а человеку не сказали бы ни слова.
       setError("failed");
-      setWaiting(false);
-      startingRef.current = false;
+    } finally {
+      setSending(false);
     }
-  }, [onSignedIn]);
+  }
 
   if (accountId) {
     return <p className="text-sm text-green-400">{t("auth.signedIn")}</p>;
@@ -104,13 +71,14 @@ export function LoginPanel({ onSignedIn }: Props) {
     <div className="space-y-3 text-center">
       <p className="text-sm text-gray-400">{t("auth.signIn")}</p>
       <div className="flex flex-col sm:flex-row gap-2 justify-center">
-        <button
-          onClick={startTelegram}
-          disabled={waiting}
-          className="px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:opacity-60 text-white text-sm font-semibold transition-colors"
+        <a
+          href={BOT_LOGIN_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold transition-colors"
         >
           {t("auth.viaTelegram")}
-        </button>
+        </a>
         <a
           href="/api/auth/steam/start"
           className="px-5 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold transition-colors"
@@ -118,7 +86,31 @@ export function LoginPanel({ onSignedIn }: Props) {
           {t("auth.viaSteam")}
         </a>
       </div>
-      {waiting && <p className="text-sm text-gray-400">{t("auth.waiting")}</p>}
+
+      <p className="text-sm text-gray-400">{t("auth.codeHint")}</p>
+
+      <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2 justify-center">
+        <label htmlFor="gt-login-code" className="sr-only">
+          {t("auth.codeLabel")}
+        </label>
+        <input
+          id="gt-login-code"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder={t("auth.codeLabel")}
+          autoComplete="one-time-code"
+          maxLength={16}
+          className="px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm tracking-widest uppercase placeholder:normal-case placeholder:tracking-normal"
+        />
+        <button
+          type="submit"
+          disabled={sending || !code.trim()}
+          className="px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 disabled:opacity-60 text-white text-sm font-semibold transition-colors"
+        >
+          {t("auth.codeSubmit")}
+        </button>
+      </form>
+
       {error && <p className="text-sm text-red-400">{t(`auth.${error}`)}</p>}
     </div>
   );

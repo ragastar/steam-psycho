@@ -27,11 +27,20 @@ export function gateTokenKey(token: string): string {
 }
 
 /**
- * Токен входа через Telegram. Отдельный от гейт-токена: у гейта другой смысл
- * («подписан ли на канал») и другой жизненный цикл.
+ * Код входа, выданный ботом. Живёт минуты: это одноразовый пропуск,
+ * а не сессия.
  */
-export function loginTokenKey(token: string): string {
-  return `login:${token}`;
+export function loginCodeKey(code: string): string {
+  return `logincode:${code}`;
+}
+
+/**
+ * Попытки ввода кода с одного адреса. Отдельный ключ от rateLimitKey: у
+ * разбора библиотеки потолок про деньги, а здесь — про перебор пропуска
+ * в чужой аккаунт, и делить одну корзину им нельзя.
+ */
+export function loginAttemptKey(ip: string): string {
+  return `ratelimit:logincode:${ip}`;
 }
 
 export function cardStatsKey(steamId64: string): string {

@@ -1,8 +1,9 @@
+import crypto from "crypto";
 import type { Api } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { getBot } from "./bot";
 import { getCache, setCache } from "@/lib/cache/redis";
-import { CACHE_TTL, gateTokenKey, loginTokenKey } from "@/lib/cache/keys";
+import { CACHE_TTL, gateTokenKey, loginCodeKey } from "@/lib/cache/keys";
 import { logGateEvent } from "@/lib/analytics/db";
 import { SITE_HOST } from "@/lib/site";
 
@@ -48,8 +49,8 @@ const MESSAGES = {
     checkButton: "Я подписался ✅",
     expired: "Ссылка устарела. Открой портрет на сайте заново.",
     error: "Что-то пошло не так. Попробуй ещё раз.",
-    loginDone: "Готово, вход выполнен. Возвращайся на сайт — страница сама обновится.",
-    loginExpired: "Ссылка входа устарела. Нажми «Войти» на сайте ещё раз.",
+    loginCode:
+      "Твой код для входа: %s\n\nВведи его на сайте, он действует 10 минут. Никому не передавай — по нему входят в твой аккаунт.",
   },
   en: {
     unlocked: "✅ Portrait unlocked! Go back to the site — it's already updated.",
@@ -57,8 +58,8 @@ const MESSAGES = {
     checkButton: "I've subscribed ✅",
     expired: "This link has expired. Open your portrait on the site again.",
     error: "Something went wrong. Please try again.",
-    loginDone: "You're signed in. Head back to the site — the page will update itself.",
-    loginExpired: "This sign-in link has expired. Tap “Sign in” on the site again.",
+    loginCode:
+      "Your sign-in code: %s\n\nEnter it on the site, it works for 10 minutes. Don't share it with anyone — it signs into your account.",
   },
 } as const;
 
@@ -78,13 +79,17 @@ export function registerHandlers() {
       return;
     }
 
-    // Токен ВХОДА и токен ГЕЙТА живут в разных ключах и означают разное.
-    // Приставка — единственное, что их различает в ссылке t.me.
-    if (payload.startsWith("login_")) {
+    // Ссылка входа не несёт токена: бот САМ выдаёт код, а вводят его на сайте.
+    // Раньше было наоборот — сайт выдавал токен, а человек молча подтверждал
+    // его нажатием, и подсунутая жертве ссылка отдавала злоумышленнику сессию
+    // на её аккаунт. Гейт-токен так и остаётся полезной нагрузкой, поэтому
+    // слово "login" отличает вход от него.
+    if (payload === "login") {
       const userId = ctx.from?.id;
       if (!userId) return;
-      const outcome = await handleLoginStart(userId, payload.slice("login_".length));
-      await ctx.reply(outcome === "ok" ? MESSAGES.ru.loginDone : MESSAGES.ru.loginExpired);
+      const code = await issueLoginCode(userId);
+      const locale = ctx.from?.language_code?.startsWith("en") ? "en" : "ru";
+      await ctx.reply(MESSAGES[locale].loginCode.replace("%s", code));
       return;
     }
 
@@ -112,15 +117,24 @@ export function registerHandlers() {
   });
 }
 
-export async function handleLoginStart(userId: number, token: string): Promise<"ok" | "expired"> {
-  const data = await getCache<{ status: string }>(loginTokenKey(token));
-  if (!data) return "expired";
-  // Подтверждаем токен ровно один раз. Иначе последний нажавший Start
-  // перезаписывает предыдущего — и заодно продлевает срок жизни токена, —
-  // то есть чужое подтверждение можно перебить своим.
-  if (data.status === "confirmed") return "expired";
-  await setCache(loginTokenKey(token), { status: "confirmed", telegramUserId: String(userId) }, 600);
-  return "ok";
+/** Знаки, которые нельзя спутать при чтении с экрана: без I, O, 0 и 1. */
+const LOGIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const LOGIN_CODE_LENGTH = 8;
+const LOGIN_CODE_TTL = 600;
+
+/**
+ * Выдаёт одноразовый код входа тому, кто написал боту.
+ *
+ * Знаки берутся из crypto.randomInt, а не из Math.random: это пропуск в
+ * аккаунт, и предсказуемый генератор здесь означает предсказуемый чужой вход.
+ */
+export async function issueLoginCode(telegramUserId: number): Promise<string> {
+  let code = "";
+  for (let i = 0; i < LOGIN_CODE_LENGTH; i++) {
+    code += LOGIN_CODE_ALPHABET[crypto.randomInt(LOGIN_CODE_ALPHABET.length)];
+  }
+  await setCache(loginCodeKey(code), { telegramUserId }, LOGIN_CODE_TTL);
+  return code;
 }
 
 async function handleGateCheck(

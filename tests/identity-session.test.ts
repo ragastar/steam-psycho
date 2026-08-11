@@ -1,6 +1,11 @@
 import crypto from "crypto";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { issueSessionCookie, verifySessionValue, SESSION_COOKIE } from "@/lib/identity/session";
+import {
+  issueSessionCookie,
+  readCookie,
+  verifySessionValue,
+  SESSION_COOKIE,
+} from "@/lib/identity/session";
 
 beforeEach(() => {
   process.env.ACCESS_SECRET = "секрет-подлиннее-шестнадцати";
@@ -40,5 +45,18 @@ describe("кука сессии", () => {
     expect(verifySessionValue(undefined)).toBeNull();
     expect(verifySessionValue("")).toBeNull();
     expect(verifySessionValue("не.кука")).toBeNull();
+  });
+});
+
+describe("чтение куки по имени", () => {
+  it("находит куку среди прочих", () => {
+    expect(readCookie("a=1; gt_session=знач; b=2", SESSION_COOKIE)).toBe("знач");
+  });
+
+  it("кука с похожим именем настоящей не считается", () => {
+    // xgt_session — не gt_session. Регулярка без границы имени считала бы
+    // иначе, и любой, кто умеет поставить куку с длинным именем, подменял бы
+    // значение, на котором держится «кто вошёл».
+    expect(readCookie("xgt_session=чужое", SESSION_COOKIE)).toBeNull();
   });
 });
