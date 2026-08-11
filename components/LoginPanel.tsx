@@ -85,6 +85,12 @@ export function LoginPanel({ onSignedIn, backSteamId }: Props) {
   return (
     <div className="space-y-3 text-center">
       <p className="text-sm text-gray-400">{t("auth.signIn")}</p>
+      {/* Способ входа выбирается один раз и навсегда: право принадлежит паре
+          «аккаунт + разбор», а склеивать аккаунты автоматически спека запрещает.
+          Купивший через Telegram, который на третий день выберет здесь Steam,
+          заведёт новый аккаунт — и заплатит второй раз. Предупреждение стоит НАД
+          кнопками: после нажатия оно уже бесполезно. */}
+      <p className="text-sm text-amber-300/90">{t("auth.sameMethod")}</p>
       <div className="flex flex-col sm:flex-row gap-2 justify-center">
         <a
           href={BOT_LOGIN_URL}

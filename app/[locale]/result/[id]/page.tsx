@@ -19,8 +19,9 @@ import { accountOwnsSteamId } from "@/lib/identity/store";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 
 interface Props {
-  // В Next 15+ параметры маршрута приходят промисом.
+  // В Next 15+ и параметры маршрута, и строка запроса приходят промисами.
   params: Promise<{ id: string; locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params: rawParams }: Props): Promise<Metadata> {
@@ -59,7 +60,7 @@ export async function generateMetadata({ params: rawParams }: Props): Promise<Me
   };
 }
 
-export default async function ResultPage({ params: rawParams }: Props) {
+export default async function ResultPage({ params: rawParams, searchParams }: Props) {
   const params = await rawParams;
   const t = await getTranslations();
   let portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
@@ -140,6 +141,14 @@ export default async function ResultPage({ params: rawParams }: Props) {
   // закрытых полей в `FreePortrait`/`TeaserProfile` нет вовсе — платный текст
   // не «размыт», а отсутствует.
   if (access !== "full") {
+    // Чем кончился вход через Steam: колбэк возвращает человека сюда с
+    // `?login=ok|taken|failed`. Читаем на сервере — компонент витрины про адрес
+    // знать не обязан, а `useSearchParams` в нём потребовал бы Suspense-обёртки
+    // при статическом пререндере. Всё, кроме двух отказов, читается как «молчим»:
+    // при `ok` человек вошёл, и говорить не о чем.
+    const rawLogin = (await searchParams).login;
+    const loginOutcome = rawLogin === "taken" || rawLogin === "failed" ? rawLogin : null;
+
     return (
       <FreeResult
         free={toFreePortrait(portrait)}
@@ -147,6 +156,7 @@ export default async function ResultPage({ params: rawParams }: Props) {
         steamId64={params.id}
         locale={params.locale}
         isOwner={isOwner}
+        loginOutcome={loginOutcome}
       />
     );
   }

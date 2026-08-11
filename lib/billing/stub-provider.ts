@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import type { PaymentProvider } from "./provider";
+import { MIN_WEBHOOK_SECRET_LENGTH, readWebhookSecret } from "./webhook-secret";
 
 /**
  * Поддельная касса. Смысл её не в том, чтобы «нарисовать успех», а в том,
@@ -91,6 +92,13 @@ const stubProvider: PaymentProvider = {
  * 2. Боевое окружение. Приём ненастоящих денег на живом сайте владелец
  *    включает осознанно — значит переменная задаётся руками, а не
  *    подразумевается.
+ * 3. Секрет подписи. Без годного секрета путь покупки всё равно оборвётся — но
+ *    оборвётся на последнем клике: заказ создастся, касса откроется, сумма
+ *    покажется, и только «Оплатить» получит 503. Человек упрётся в экран, с
+ *    которого некуда идти, а владелец узнает об этом из лога уже после. Пусть
+ *    касса не стартует вовсе: витрина честно скажет «оплата пока не
+ *    подключена» ещё до заказа. Проверка в самом вебхуке остаётся на месте —
+ *    она про приём чужих подтверждений, а не про запуск кассы.
  */
 export function getStubProvider(): PaymentProvider | null {
   if (process.env.PAYWALL_MODE !== "stub") return null;
@@ -101,5 +109,13 @@ export function getStubProvider(): PaymentProvider | null {
     );
     return null;
   }
+
+  if (!readWebhookSecret()) {
+    console.error(
+      `[billing] PAYMENT_WEBHOOK_SECRET не задан или короче ${MIN_WEBHOOK_SECRET_LENGTH} знаков — поддельная касса не запущена`,
+    );
+    return null;
+  }
+
   return stubProvider;
 }

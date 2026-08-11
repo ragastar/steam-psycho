@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { PayReturnStatus } from "@/components/PayReturnStatus";
+import { getStubProvider } from "@/lib/billing/stub-provider";
 
 interface Props {
   // В Next 15+ и параметры маршрута, и строка запроса приходят промисами.
@@ -32,16 +33,27 @@ export default async function PayReturnPage({ params: rawParams, searchParams }:
   const id = Number(typeof raw === "string" ? raw : NaN);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
+  // Плашка про ненастоящие деньги — только когда деньги и правда ненастоящие.
+  // Эта страница, в отличие от страницы кассы, общая для всех приёмщиков:
+  // безусловная плашка означала бы, что в день подключения ЮКассы первый живой
+  // покупатель вернётся из банка и прочитает «деньги не списываются» при
+  // списанных 199 ₽. Спрашиваем ту же дверь, что открывает поддельную кассу:
+  // если её нет, платил человек по-настоящему.
+  const stub = getStubProvider() !== null;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md space-y-4">
-        {/* Плашка держится и здесь: возврат — часть той же поддельной кассы, и
-            человек не должен решить, что с него списали настоящие деньги. */}
-        <div className="rounded-xl border-2 border-yellow-400 bg-yellow-400/15 px-4 py-3 text-center">
-          <p className="text-sm font-bold uppercase tracking-wider text-yellow-300">
-            {t("pay.testMode")}
-          </p>
-        </div>
+        {/* При поддельной кассе плашка держится и здесь: возврат — часть того же
+            пути, и человек не должен решить, что с него списали настоящие
+            деньги. */}
+        {stub && (
+          <div className="rounded-xl border-2 border-yellow-400 bg-yellow-400/15 px-4 py-3 text-center">
+            <p className="text-sm font-bold uppercase tracking-wider text-yellow-300">
+              {t("pay.testMode")}
+            </p>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-gray-800 bg-gray-900/80 p-5 sm:p-6 space-y-5">
           <h1 className="text-xl font-bold text-center text-gray-100">{t("pay.return.title")}</h1>

@@ -6,9 +6,24 @@ import { useRouter } from "next/navigation";
 import { priceInRubles } from "@/lib/billing/price";
 import { LoginPanel } from "./LoginPanel";
 
+/**
+ * Чем кончился вход через Steam. `ok` сюда не доезжает намеренно: вход
+ * состоялся, говорить не о чем, и разворачивать панель входа заново незачем.
+ */
+export type LoginOutcome = "taken" | "failed";
+
 interface PaywallBlockProps {
   steamId64: string;
   locale: string;
+  /**
+   * Исход входа через Steam, прочитанный на сервере из `?login=`.
+   *
+   * Читает страница, а не этот компонент: своим эффектом он ловил бы адрес
+   * после первой отрисовки (лишний проход и жалоба react-hooks), а
+   * `useSearchParams` требует Suspense-обёртки при статическом пререндере —
+   * поломку такого рода `npm run verify` не ловит, она нашлась бы на выкате.
+   */
+  loginOutcome?: LoginOutcome | null;
   /**
    * Сколько роастов закрыто. Схема допускает 5–6 роастов на карточку, один из
    * них уходит в бесплатную часть — значит закрытых бывает и четыре. Продающая
@@ -34,12 +49,20 @@ const INCLUDES = [
   { icon: "📊", key: "analytics" },
 ] as const;
 
-export function PaywallBlock({ steamId64, locale, lockedCount }: PaywallBlockProps) {
+export function PaywallBlock({ steamId64, locale, lockedCount, loginOutcome = null }: PaywallBlockProps) {
   const t = useTranslations();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
   const [refusal, setRefusal] = useState<Refusal>("");
+  /**
+   * Отказ входа показывается ровно до следующего удачного входа. Вход через
+   * Steam уводит браузер целиком и возвращает сюда с `?login=taken|failed`:
+   * без единого слова на экране человек жмёт «купить» снова, получает 401,
+   * снова панель входа — и так по кругу без выхода.
+   */
+  const [loginDismissed, setLoginDismissed] = useState(false);
+  const showLoginOutcome = loginOutcome && !loginDismissed ? loginOutcome : null;
 
   useEffect(() => {
     // Возврат «Назад» с кассы. Уход на payUrl кнопку намеренно не
@@ -154,13 +177,21 @@ export function PaywallBlock({ steamId64, locale, lockedCount }: PaywallBlockPro
         {/* Дисклеймер живёт рядом с кнопкой, а не только в подвале: человек
             платит именно здесь, и здесь же обязан прочесть, что покупает
             развлечение, а не заключение специалиста (RISK-1 из ревью). */}
-        <p className="text-[11px] leading-relaxed text-gray-500 text-center">
+        <p className="text-xs leading-relaxed text-gray-400 text-center">
           {t("paywall.disclaimer")}
         </p>
 
         {refusal && (
           <p role="alert" className="text-sm text-red-400 text-center">
             {t(`paywall.${refusal}`)}
+          </p>
+        )}
+
+        {/* Чем кончился вход через Steam. Тексты те же, что показывает панель
+            входа на свои отказы, — заводить вторые незачем. */}
+        {showLoginOutcome && (
+          <p role="alert" className="text-sm text-red-400 text-center">
+            {t(`auth.${showLoginOutcome}`)}
           </p>
         )}
       </div>
@@ -177,6 +208,8 @@ export function PaywallBlock({ steamId64, locale, lockedCount }: PaywallBlockPro
             backSteamId={steamId64}
             onSignedIn={() => {
               setNeedLogin(false);
+              // Прошлый неудачный вход больше не новость: этот удался.
+              setLoginDismissed(true);
               buy();
             }}
           />

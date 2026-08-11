@@ -353,7 +353,8 @@
     "codeLabel": "Code from the bot",
     "codeSubmit": "Sign in with code",
     "codeWrong": "That code didn't work. Check you entered all of it, or get a new one from the bot.",
-    "tooMany": "Too many attempts. Wait an hour and try again."
+    "tooMany": "Too many attempts. Wait an hour and try again.",
+    "sameMethod": "Bought a read before? Sign in the same way you did last time — the purchase is tied to it. A different way creates a new account, and you'd have to pay again."
   },
   "paywall": {
     "title": "That was the free part",
@@ -400,7 +401,8 @@
       "delayed": "The bank is taking its time. It happens: the money is gone, the notice is still in transit.",
       "iPaid": "I've paid",
       "checking": "Checking...",
-      "stillWaiting": "Still no confirmation. Check back in a minute — access opens on its own."
+      "stillWaiting": "Still no confirmation. Check back in a minute — access opens on its own.",
+      "signedOut": "Looks like you're signed out. The payment is fine, but the read only opens once you're signed in — go back to it and sign in the same way as before."
     }
   }
 }

@@ -6,7 +6,6 @@ export const CACHE_TTL = {
   portrait: 24 * 3600,          // 24 hours
   aggregatedProfile: 24 * 3600, // 24 hours
   rateLimit: 3600,              // 1 hour
-  gate: 24 * 3600,              // 24 hours
   artImage: 30 * 24 * 3600,    // 30 days
   /**
    * Купленный разбор. «Вечно» — это очень долгий срок, а не отдельный
@@ -30,10 +29,6 @@ export function profileKey(steamId64: string): string {
 
 export function rateLimitKey(ip: string): string {
   return `ratelimit:${ip}`;
-}
-
-export function gateTokenKey(token: string): string {
-  return `gate:${token}`;
 }
 
 /**

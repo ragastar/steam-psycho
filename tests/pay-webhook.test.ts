@@ -539,6 +539,22 @@ describe("поддельная касса", () => {
     expect(payment.providerOrderId).toBe("stub-42");
   });
 
+  it("без годного секрета касса не стартует вовсе, а не отказывает на последнем клике", async () => {
+    // Иначе владелец ставит секрет в 16 знаков — и всё выглядит рабочим:
+    // витрина рисуется, заказ создаётся, касса открывается, сумма показана.
+    // Отказ приходит только на «Оплатить», человеку с этого экрана уже некуда
+    // идти, а первая внятная строка в логе появляется после того, как он упёрся.
+    const short = await freshWorld({ dbPath, mode: "stub", secret: "коротко" });
+    expect(short.stub.getStubProvider()).toBeNull();
+
+    const none = await freshWorld({ dbPath, mode: "stub", secret: undefined });
+    expect(none.stub.getStubProvider()).toBeNull();
+
+    // А с годным секретом — стартует: отказывает именно длина.
+    const ok = await freshWorld({ dbPath, mode: "stub", secret: SECRET });
+    expect(ok.stub.getStubProvider()?.name).toBe("stub");
+  });
+
   it("при PAYWALL_MODE=off заглушку нельзя получить и напрямую из фабрики", async () => {
     // Витрина и касса — одно значение, а не два независимых флага: код задач
     // 5 и 6, импортирующий заглушку напрямую, не должен уметь провести

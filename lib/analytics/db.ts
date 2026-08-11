@@ -60,6 +60,10 @@ function migrate(db: Database.Database) {
       cached INTEGER NOT NULL DEFAULT 0
     );
 
+    -- Гейт на подписку канала отменён (2026-08-10), новых строк тут не
+    -- появляется. Таблица заводится по-прежнему: в боевой базе лежат события за
+    -- прошлые месяцы, админка их читает, а на чистой базе без CREATE её запросы
+    -- падали бы.
     CREATE TABLE IF NOT EXISTS gate_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       steam_id64 TEXT,
@@ -144,18 +148,8 @@ export function logArtGeneration(data: {
   }
 }
 
-export function logGateEvent(data: {
-  steamId64?: string;
-  event: "created" | "unlocked" | "not_subscribed";
-}) {
-  try {
-    const d = getDb();
-    if (!d) return;
-    d.prepare(`INSERT INTO gate_events (steam_id64, event, timestamp) VALUES (?, ?, ?)`)
-      .run(data.steamId64 || null, data.event, Date.now());
-  } catch (err) {
-    console.error("[analytics] logGateEvent failed:", err);
-  }
-}
+// Записи в gate_events здесь больше нет: гейт на подписку канала отменён, и
+// писать в эту таблицу стало некому. Сама таблица и запросы к ней остаются —
+// в боевой базе лежат события за прошлые месяцы, и админка их показывает.
 
 export { getDb };

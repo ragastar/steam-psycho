@@ -4,6 +4,7 @@ import { applyComputedFacts } from "@/lib/llm/facts";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { persistPurchased } from "@/lib/cache/purchased";
 import { steamIdHasEntitlement } from "@/lib/billing/store";
+import { paywallMode } from "@/lib/access/entitlement";
 import { CACHE_TTL, portraitKey, profileKey, cardStatsKey, rarityKey, rateLimitKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
@@ -101,7 +102,13 @@ export async function POST(req: Request) {
     // и выбрасывать через сутки то, за что кто-то заплатил, нельзя. Второй
     // конец этой же заботы — в вебхуке (lib/cache/purchased.ts): к моменту
     // покупки карточка уже лежит, и сюда исполнение больше не заходит.
-    const purchased = steamIdHasEntitlement(steamId64);
+    //
+    // Режим спрашивается ПЕРЕД базой: при `PAYWALL_MODE=off` заказов не
+    // существует, а обращение к store открыло бы файл SQLite и прогнало
+    // миграцию таблиц оплаты на каждую генерацию. Прав это не даёт и ничего не
+    // ломает, но обещание «при `off` всё ровно как до этой работы» перестаёт
+    // быть буквальным, а «ровно как раньше» — единственный способ откатиться.
+    const purchased = paywallMode() !== "off" && steamIdHasEntitlement(steamId64);
     await setCache(
       portraitKey(steamId64, locale),
       portrait,

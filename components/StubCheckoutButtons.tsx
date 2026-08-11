@@ -61,7 +61,11 @@ export function StubCheckoutButtons({ orderId, locale, steamId64, amountKop }: P
           headers: { "Content-Type": "application/json", [data.header]: data.signature },
           body: data.body,
         });
-        if (!hook.ok) throw new Error(`webhook ${hook.status}`);
+        // 409 — не отказ, а «судьба заказа уже решена»: оплачен в соседней
+        // вкладке, отменён, сумма не сошлась. Совет «попробуй ещё раз» на него
+        // не сбудется НИКОГДА, сколько ни жми, — а страница возврата покажет
+        // настоящий статус заказа. Туда и уводим, как при удачном исходе.
+        if (!hook.ok && hook.status !== 409) throw new Error(`webhook ${hook.status}`);
 
         // Уход на страницу возврата — не клиентский переход: при живой кассе
         // сюда браузер возвращается с чужого домена целой перезагрузкой, и путь

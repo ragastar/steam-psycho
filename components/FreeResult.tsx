@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import { LocaleSwitcher } from "./LocaleSwitcher";
-import { PaywallBlock } from "./PaywallBlock";
+import { PaywallBlock, type LoginOutcome } from "./PaywallBlock";
+import { ShareButtons } from "./ShareButtons";
 import { RoastsList } from "./Card/RoastsList";
 import { StatsGrid } from "./Card/StatsGrid";
 import type { FreePortrait } from "@/lib/access/redact-portrait";
@@ -28,6 +29,8 @@ interface FreeResultProps {
   locale: string;
   /** Владение проверено на сервере (accountOwnsSteamId) — здесь только бейдж. */
   isOwner?: boolean;
+  /** Исход входа через Steam из `?login=` — его показывает витрина покупки. */
+  loginOutcome?: LoginOutcome | null;
 }
 
 const RARITY_BORDER: Record<Rarity, string> = {
@@ -79,7 +82,14 @@ const STAT_KEYS = ["dedication", "mastery", "exploration", "hoarding", "social",
  */
 const SKELETON_WIDTHS = ["72%", "48%", "84%", "36%", "60%"];
 
-export function FreeResult({ free, profile, steamId64, locale, isOwner = false }: FreeResultProps) {
+export function FreeResult({
+  free,
+  profile,
+  steamId64,
+  locale,
+  isOwner = false,
+  loginOutcome = null,
+}: FreeResultProps) {
   const t = useTranslations();
 
   const rarity = free.rarity;
@@ -177,10 +187,34 @@ export function FreeResult({ free, profile, steamId64, locale, isOwner = false }
           </div>
         </motion.div>
 
+        {/*
+          Бесплатный вердикт — это и есть то, чем делятся (спека, §Поток, п. 2),
+          и точка входа обязана быть на экране непокупателя, а не только у того,
+          кто уже заплатил.
+
+          Наружу уходит только бесплатное: имя первого архетипа, редкость и
+          эмодзи лежат в `FreePortrait`, платных полей у него нет вовсе. Ссылка
+          ведёт на ту же страницу разбора, а её описание и картинка карточки уже
+          урезаны до бесплатного роаста (задача 4) — открывший её чужой человек
+          увидит ровно этот же вид.
+        */}
+        <ShareButtons
+          steamId64={steamId64}
+          archetype={free.primaryArchetype.name}
+          rarity={rarity}
+          emoji={free.emoji}
+          locale={locale}
+        />
+
         {/* Витрина покупки стоит ПЕРЕД размытым, а не поверх него: оверлей на
             320px обрезал бы либо цену, либо дисклеймер, а читаемость здесь
             важнее приёма. */}
-        <PaywallBlock steamId64={steamId64} locale={locale} lockedCount={free.lockedRoasts.length} />
+        <PaywallBlock
+          steamId64={steamId64}
+          locale={locale}
+          lockedCount={free.lockedRoasts.length}
+          loginOutcome={loginOutcome}
+        />
 
         <div className="space-y-2">
           <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold text-center">

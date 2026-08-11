@@ -411,7 +411,7 @@ describe("купленное хранится долго, а не сутки", (
     expect(cacheState.has(world.keys.portraitKey(STEAM_ID, "ru"))).toBe(false);
   });
 
-  it("генерация при существующем праве кладёт портрет надолго", async () => {
+  it("генерация при существующем праве кладёт надолго и портрет, и его спутников", async () => {
     const world = await freshWorld({ dbPath });
     const accountId = makeAccount(world.identity);
     const orderId = makeOrder(world.billing, accountId, "keep-on-generate");
@@ -429,9 +429,17 @@ describe("купленное хранится долго, а не сутки", (
     );
 
     expect(res.status).toBe(200);
-    expect(cacheState.get(world.keys.portraitKey(STEAM_ID, "ru"))!.ttl).toBe(
-      world.keys.CACHE_TTL.purchased,
-    );
+    const long = world.keys.CACHE_TTL.purchased;
+    expect(cacheState.get(world.keys.portraitKey(STEAM_ID, "ru"))!.ttl).toBe(long);
+    // Спутники карточки проверяются отдельно, и это не придирка: портрет кладут
+    // ДВА механизма — свой срок в setCache и persistPurchased, — а профиль,
+    // цифры и редкость держатся только на втором. Смотри тест лишь на портрет,
+    // и вызов persistPurchased можно было бы стереть, не уронив ни одного
+    // теста; покупатель после истечения карточки получал бы «данные устарели»
+    // каждые сутки заново.
+    expect(cacheState.get(world.keys.profileKey(STEAM_ID))!.ttl).toBe(long);
+    expect(cacheState.get(world.keys.cardStatsKey(STEAM_ID))!.ttl).toBe(long);
+    expect(cacheState.get(world.keys.rarityKey(STEAM_ID))!.ttl).toBe(long);
   });
 
   it("а без права — по-прежнему суточный срок", async () => {

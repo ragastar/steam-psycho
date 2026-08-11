@@ -12,7 +12,16 @@ interface Props {
 const POLL_EVERY_MS = 2000;
 const POLL_LIMIT_MS = 60_000;
 
-type Phase = "waiting" | "paid" | "declined" | "delayed";
+/**
+ * Потолок на ОДИН запрос. Минутный потолок проверяется между тиками, и без
+ * этого таймаута он не спасает от главного случая: телефон в метро или
+ * captive-portal, который соединение принимает и молчит. Промис не разрешается
+ * никогда, тика не будет, минута не наступит — крутилка висит вечно, и кнопка
+ * «я оплатил» не появляется вовсе.
+ */
+const REQUEST_TIMEOUT_MS = 8000;
+
+type Phase = "waiting" | "paid" | "declined" | "delayed" | "signedOut";
 
 /**
  * Возврат с кассы.
@@ -39,10 +48,28 @@ export function PayReturnStatus({ orderId, locale }: Props) {
 
   /** Возвращает true, если судьба заказа решилась и спрашивать больше нечего. */
   const check = useCallback(async (): Promise<boolean> => {
+    // Свой AbortController, а не AbortSignal.timeout: последний есть не во всех
+    // браузерах, которые сюда приходят с телефона.
+    const abort = new AbortController();
+    const cutoff = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
+
     try {
-      const res = await fetch(`/api/pay/status/${orderId}`, { cache: "no-store" });
-      // 401/404/503 — не повод объявить «не оплачено»: сессия могла протухнуть,
-      // база — не ответить. Продолжаем спрашивать, пока не кончится минута.
+      const res = await fetch(`/api/pay/status/${orderId}`, {
+        cache: "no-store",
+        signal: abort.signal,
+      });
+
+      // Сессия кончилась (вышел в соседней вкладке, протухла кука). Ждать
+      // дальше бессмысленно: право выдано и висит на аккаунте, но пока человек
+      // не войдёт заново, страница разбора его не покажет — «доступ откроется
+      // сам» было бы враньём. Опрос прекращаем и просим войти.
+      if (res.status === 401) {
+        if (alive.current) setPhase("signedOut");
+        return true;
+      }
+
+      // 404/503 — не повод объявить «не оплачено»: база могла не ответить.
+      // Продолжаем спрашивать, пока не кончится минута.
       if (!res.ok) return false;
 
       const data: { status?: unknown; steamId64?: unknown } = await res.json();
@@ -67,8 +94,11 @@ export function PayReturnStatus({ orderId, locale }: Props) {
       if (typeof data.steamId64 === "string") setSteamId64(data.steamId64);
       return false;
     } catch {
-      // Сеть моргнула — это не ответ банка. Просто попробуем ещё раз.
+      // Сеть моргнула или запрос сняли по таймауту — это не ответ банка.
+      // Просто попробуем ещё раз, а потолок в минуту всё закончит.
       return false;
+    } finally {
+      clearTimeout(cutoff);
     }
   }, [orderId, locale]);
 
@@ -134,6 +164,22 @@ export function PayReturnStatus({ orderId, locale }: Props) {
         <>
           <p className="text-base text-red-300" role="status">
             {t("pay.return.declined")}
+          </p>
+          <a
+            href={backHref}
+            className="inline-block px-6 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-semibold text-gray-200 transition-colors"
+          >
+            {t("pay.backToResult")}
+          </a>
+        </>
+      )}
+
+      {/* Умершая сессия не должна выглядеть как ожидание. Кнопки «я оплатил»
+          здесь нет намеренно: спрашивать статус нечем, пока никто не вошёл. */}
+      {phase === "signedOut" && (
+        <>
+          <p className="text-base text-amber-300" role="status">
+            {t("pay.return.signedOut")}
           </p>
           <a
             href={backHref}

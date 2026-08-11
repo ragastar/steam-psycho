@@ -90,6 +90,15 @@ export default async function StubCheckoutPage({ params: rawParams }: Props) {
             </div>
           </div>
 
+          {/* Дисклеймер стоит НАД кнопками и набран читаемо (RISK-1 из ревью).
+              Одиннадцать пикселей серым по серому под кнопками — это текст,
+              который не прочтёт никто, а смысл требования ровно обратный:
+              человек обязан ДО оплаты понять, что покупает шутку про себя.
+              Плашка тестового режима громкости не пожалела — этот текст важнее. */}
+          <p className="text-sm leading-relaxed text-gray-300 border-l-2 border-gray-700 pl-3">
+            {t("pay.disclaimer")}
+          </p>
+
           {open ? (
             <StubCheckoutButtons
               orderId={order.id}
@@ -111,12 +120,6 @@ export default async function StubCheckoutPage({ params: rawParams }: Props) {
               </a>
             </div>
           )}
-
-          {/* Дисклеймер обязателен и здесь, а не только на витрине (RISK-1 из
-              ревью): деньги человек отдаёт именно на этой странице. */}
-          <p className="text-[11px] leading-relaxed text-gray-500 text-center">
-            {t("pay.disclaimer")}
-          </p>
         </div>
       </div>
     </div>

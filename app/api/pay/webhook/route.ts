@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getProvider, PAYMENT_SIGNATURE_HEADER, MIN_WEBHOOK_SECRET_LENGTH } from "@/lib/billing/provider";
+import { getProvider, PAYMENT_SIGNATURE_HEADER } from "@/lib/billing/provider";
+import { MIN_WEBHOOK_SECRET_LENGTH } from "@/lib/billing/webhook-secret";
 import { billingAvailable, findOrder, markCancelled, markPaid } from "@/lib/billing/store";
 import { persistPurchased } from "@/lib/cache/purchased";
 
@@ -101,6 +102,14 @@ export async function POST(req: Request) {
   const result = markPaid(order.id, verified.providerOrderId);
 
   if (result === "granted") {
+    // Единственная строка про УСПЕХ на всём пути покупки. Без неё в логе видно
+    // только отказы, и на вопрос «кто-нибудь дошёл до конца?» отвечать пришлось
+    // бы запросом к SQLite. Ни аккаунта, ни Steam ID здесь нет намеренно: номер
+    // заказа связывает запись с базой, а личность в логах ни к чему.
+    console.log(
+      `[pay] заказ ${order.id} оплачен: ${order.provider}, ${verified.amountKop} ${verified.currency}`,
+    );
+
     // Право выдано — теперь купленное обязано пережить сутки. Продлевать надо
     // именно здесь: карточка легла в кеш ещё на бесплатном вердикте, и
     // генерации, которая могла бы положить её заново, больше не будет.
