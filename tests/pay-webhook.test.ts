@@ -29,8 +29,10 @@ function setEnv(name: string, value: string | undefined): void {
   else process.env[name] = value;
 }
 
-const SECRET = "секрет-подписи-для-теста";
+/** Не короче 32 знаков: коротким секретам маршрут не доверяет. */
+const SECRET = "секрет-подписи-для-теста-подлиннее-тридцати-двух";
 const STEAM_ID = "76561197990915489";
+const PRICE_KOP = 19900;
 
 let dbPath: string;
 let nextTelegramId = 1;
@@ -76,9 +78,23 @@ function webhookRequest(rawBody: string, signature: string | null): Request {
   });
 }
 
-/** Тело подтверждения ровно в том виде, в каком его шлёт поддельная касса. */
-function paidBody(orderId: number): string {
-  return JSON.stringify({ orderId, providerOrderId: `stub-${orderId}` });
+/**
+ * Тело подтверждения ровно в том виде, в каком его шлёт поддельная касса.
+ * Исход, сумма и валюта — часть подписанного тела: маршрут обязан сверять
+ * уплаченное с заказанным, а не верить факту прихода подтверждения.
+ */
+function confirmBody(
+  orderId: number,
+  over: Partial<{ outcome: string; amountKop: number; currency: string; providerOrderId: string }> = {},
+): string {
+  return JSON.stringify({
+    orderId,
+    providerOrderId: `stub-${orderId}`,
+    outcome: "paid",
+    amountKop: PRICE_KOP,
+    currency: "RUB",
+    ...over,
+  });
 }
 
 describe("вебхук оплаты", () => {
@@ -92,7 +108,7 @@ describe("вебхук оплаты", () => {
       provider: "stub",
       idempotencyKey: "webhook-ok",
     });
-    const body = paidBody(order!.id);
+    const body = confirmBody(order!.id);
 
     const res = await route.POST(webhookRequest(body, stub.signStubWebhook(body)));
 
@@ -112,7 +128,7 @@ describe("вебхук оплаты", () => {
       provider: "stub",
       idempotencyKey: "webhook-twice",
     });
-    const body = paidBody(order!.id);
+    const body = confirmBody(order!.id);
     const signature = stub.signStubWebhook(body);
 
     const first = await route.POST(webhookRequest(body, signature));
@@ -141,7 +157,7 @@ describe("вебхук оплаты", () => {
       provider: "stub",
       idempotencyKey: "webhook-bad-sig",
     });
-    const body = paidBody(order!.id);
+    const body = confirmBody(order!.id);
 
     // Заведомо не подпись и не той длины — отсеивается сравнением длины.
     const res = await route.POST(webhookRequest(body, "deadbeef"));
@@ -162,7 +178,7 @@ describe("вебхук оплаты", () => {
       provider: "stub",
       idempotencyKey: "webhook-same-length",
     });
-    const body = paidBody(order!.id);
+    const body = confirmBody(order!.id);
     const real = stub.signStubWebhook(body);
     // Ровно та же длина, отличается одним знаком: проверка длины такую подпись
     // не отсеет, отказать обязано сравнение содержимого.
@@ -198,7 +214,7 @@ describe("вебхук оплаты", () => {
     // Подпись честная, но снята с другого тела: подпись обязана быть привязана
     // к байтам ЭТОГО запроса, а не быть просто «валидной строкой».
     const res = await route.POST(
-      webhookRequest(paidBody(victim!.id), stub.signStubWebhook(paidBody(mine!.id))),
+      webhookRequest(confirmBody(victim!.id), stub.signStubWebhook(confirmBody(mine!.id))),
     );
 
     expect(res.status).toBe(401);
@@ -217,7 +233,7 @@ describe("вебхук оплаты", () => {
       idempotencyKey: "webhook-no-sig",
     });
 
-    const res = await route.POST(webhookRequest(paidBody(order!.id), null));
+    const res = await route.POST(webhookRequest(confirmBody(order!.id), null));
 
     expect(res.status).toBe(401);
     expect(billing.findOrder(order!.id)!.status).toBe("created");
@@ -226,7 +242,7 @@ describe("вебхук оплаты", () => {
 
   it("вебхук на несуществующий заказ — 404, ничего не выдаётся", async () => {
     const { stub, route } = await freshWorld({ dbPath, mode: "stub", secret: SECRET });
-    const body = paidBody(999999);
+    const body = confirmBody(999999);
 
     const res = await route.POST(webhookRequest(body, stub.signStubWebhook(body)));
 
@@ -252,7 +268,7 @@ describe("нет секрета — приёмщик не стартует", () 
       provider: "stub",
       idempotencyKey: "webhook-no-secret",
     });
-    const body = paidBody(order!.id);
+    const body = confirmBody(order!.id);
 
     const unsigned = await route.POST(webhookRequest(body, null));
     const signed = await route.POST(webhookRequest(body, "a".repeat(64)));
@@ -266,9 +282,192 @@ describe("нет секрета — приёмщик не стартует", () 
   it("переменной нет вовсе — тоже 503", async () => {
     const { route } = await freshWorld({ dbPath, mode: "stub", secret: undefined });
 
-    const res = await route.POST(webhookRequest(paidBody(1), "a".repeat(64)));
+    const res = await route.POST(webhookRequest(confirmBody(1), "a".repeat(64)));
 
     expect(res.status).toBe(503);
+  });
+
+  it("короткий секрет не принимается — 503", async () => {
+    // Секрет — единственное, что стоит между чужим человеком и бесплатным
+    // правом, а подбирают его локально: в сеть уходит один запрос на удачного
+    // кандидата. Короткий секрет — это отсутствие секрета, только незаметное.
+    const { identity, billing, stub, route } = await freshWorld({ dbPath, mode: "stub", secret: "коротко" });
+    const accountId = makeAccount(identity);
+    const order = billing.createOrder({
+      accountId,
+      steamId64: STEAM_ID,
+      amountKop: PRICE_KOP,
+      provider: "stub",
+      idempotencyKey: "webhook-short-secret",
+    });
+    const body = confirmBody(order!.id);
+
+    // Подпись честная — секрет тот же самый. Отказать должна именно его длина.
+    const res = await route.POST(webhookRequest(body, stub.signStubWebhook(body)));
+
+    expect(res.status).toBe(503);
+    expect(billing.findOrder(order!.id)!.status).toBe("created");
+    expect(countEntitlements()).toBe(0);
+  });
+
+  it("секрет ровно в 32 знака уже годится", async () => {
+    const { identity, billing, stub, route } = await freshWorld({
+      dbPath,
+      mode: "stub",
+      secret: "a".repeat(32),
+    });
+    const accountId = makeAccount(identity);
+    const order = billing.createOrder({
+      accountId,
+      steamId64: STEAM_ID,
+      amountKop: PRICE_KOP,
+      provider: "stub",
+      idempotencyKey: "webhook-border-secret",
+    });
+    const body = confirmBody(order!.id);
+
+    const res = await route.POST(webhookRequest(body, stub.signStubWebhook(body)));
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("исход платежа и сверка суммы", () => {
+  /** Заводит аккаунт и заказ на 19900 копеек, возвращает всё нужное тесту. */
+  async function orderedWorld(key: string) {
+    const world = await freshWorld({ dbPath, mode: "stub", secret: SECRET });
+    const accountId = makeAccount(world.identity);
+    const order = world.billing.createOrder({
+      accountId,
+      steamId64: STEAM_ID,
+      amountKop: PRICE_KOP,
+      provider: "stub",
+      idempotencyKey: key,
+    });
+    return { ...world, accountId, orderId: order!.id };
+  }
+
+  async function send(world: Awaited<ReturnType<typeof orderedWorld>>, body: string) {
+    return world.route.POST(webhookRequest(body, world.stub.signStubWebhook(body)));
+  }
+
+  it("исход «не оплачено» отменяет заказ и не выдаёт права", async () => {
+    const world = await orderedWorld("webhook-declined");
+
+    const res = await send(world, confirmBody(world.orderId, { outcome: "declined" }));
+
+    // 200: касса своё дело сделала и ретраить ей нечего. Но заказ закрыт
+    // отказом, а права нет.
+    expect(res.status).toBe(200);
+    expect(world.billing.findOrder(world.orderId)!.status).toBe("cancelled");
+    expect(world.billing.hasEntitlement(world.accountId, STEAM_ID)).toBe(false);
+    expect(countEntitlements()).toBe(0);
+  });
+
+  it("повторный отказ по тому же заказу — снова 200 и ничего не ломает", async () => {
+    const world = await orderedWorld("webhook-declined-twice");
+    const body = confirmBody(world.orderId, { outcome: "declined" });
+
+    const first = await send(world, body);
+    const second = await send(world, body);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(world.billing.findOrder(world.orderId)!.status).toBe("cancelled");
+    expect(countEntitlements()).toBe(0);
+  });
+
+  it("сумма меньше заказанной права не выдаёт", async () => {
+    const world = await orderedWorld("webhook-underpaid");
+
+    // Подпись честная: тело написано тем, у кого есть секрет. Но заплачена
+    // одна копейка вместо 199 рублей — сверять сумму обязан маршрут.
+    const res = await send(world, confirmBody(world.orderId, { amountKop: 1 }));
+
+    expect(res.status).toBe(409);
+    expect(world.billing.findOrder(world.orderId)!.status).toBe("created");
+    expect(world.billing.hasEntitlement(world.accountId, STEAM_ID)).toBe(false);
+    expect(countEntitlements()).toBe(0);
+  });
+
+  it("другая валюта права не выдаёт", async () => {
+    const world = await orderedWorld("webhook-wrong-currency");
+
+    // 19900 тугриков — не 19900 копеек.
+    const res = await send(world, confirmBody(world.orderId, { currency: "MNT" }));
+
+    expect(res.status).toBe(409);
+    expect(world.billing.findOrder(world.orderId)!.status).toBe("created");
+    expect(countEntitlements()).toBe(0);
+  });
+
+  it("переплата права тоже не выдаёт автоматом", async () => {
+    const world = await orderedWorld("webhook-overpaid");
+
+    // Сумма обязана СОВПАДАТЬ: «больше» — такое же расхождение, как «меньше»,
+    // и разбирать его должен человек, а не маршрут.
+    const res = await send(world, confirmBody(world.orderId, { amountKop: PRICE_KOP + 1 }));
+
+    expect(res.status).toBe(409);
+    expect(countEntitlements()).toBe(0);
+  });
+
+  it("неизвестный исход не считается оплатой", async () => {
+    const world = await orderedWorld("webhook-unknown-outcome");
+
+    const res = await send(world, confirmBody(world.orderId, { outcome: "maybe" }));
+
+    expect(res.status).toBe(401);
+    expect(world.billing.findOrder(world.orderId)!.status).toBe("created");
+    expect(countEntitlements()).toBe(0);
+  });
+
+  it("оплата по уже отменённому заказу не выдаёт права и кричит в лог", async () => {
+    const world = await orderedWorld("webhook-paid-after-cancel");
+    const complain = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await send(world, confirmBody(world.orderId, { outcome: "declined" }));
+      complain.mockClear();
+
+      const res = await send(world, confirmBody(world.orderId));
+
+      // Касса думает, что всё хорошо, а покупатель ничего не получил — такое
+      // расхождение обязано быть видно человеку, а не тонуть в тишине.
+      expect(res.status).toBe(409);
+      expect(complain).toHaveBeenCalled();
+      expect(world.billing.findOrder(world.orderId)!.status).toBe("cancelled");
+      expect(countEntitlements()).toBe(0);
+    } finally {
+      complain.mockRestore();
+    }
+  });
+
+  it("отказ по уже оплаченному заказу оплату не отбирает", async () => {
+    const world = await orderedWorld("webhook-cancel-after-paid");
+    await send(world, confirmBody(world.orderId));
+
+    const res = await send(world, confirmBody(world.orderId, { outcome: "declined" }));
+
+    expect(res.status).toBe(409);
+    expect(world.billing.findOrder(world.orderId)!.status).toBe("paid");
+    expect(world.billing.hasEntitlement(world.accountId, STEAM_ID)).toBe(true);
+  });
+});
+
+describe("недоступная база не должна выглядеть как «нет такого заказа»", () => {
+  /** Каталога не существует — база не откроется никогда, а не разово. */
+  const brokenPath = "/nonexistent-dir-для-теста/billing.db";
+
+  it("вебхук отвечает 5xx, а не 404", async () => {
+    const { stub, route } = await freshWorld({ dbPath: brokenPath, mode: "stub", secret: SECRET });
+    const body = confirmBody(1);
+
+    const res = await route.POST(webhookRequest(body, stub.signStubWebhook(body)));
+
+    // 404 касса считает окончательным ответом и ретраить перестаёт: деньги
+    // взяты, право потеряно навсегда. Состояние это стойкое — неоткрываемый
+    // файл базы или упавшая миграция, — поэтому так пропали бы ВСЕ оплаты.
+    expect(res.status).toBeGreaterThanOrEqual(500);
   });
 });
 
@@ -315,7 +514,7 @@ describe("выбор приёмщика по PAYWALL_MODE", () => {
       provider: "stub",
       idempotencyKey: "webhook-mode-off",
     });
-    const body = paidBody(order!.id);
+    const body = confirmBody(order!.id);
     const signature = stub.signStubWebhook(body);
 
     // Тот же самый запрос, что выше проходил, — но касса выключена.
@@ -338,6 +537,15 @@ describe("поддельная касса", () => {
 
     expect(payment.payUrl).toBe("/ru/pay/42");
     expect(payment.providerOrderId).toBe("stub-42");
+  });
+
+  it("при PAYWALL_MODE=off заглушку нельзя получить и напрямую из фабрики", async () => {
+    // Витрина и касса — одно значение, а не два независимых флага: код задач
+    // 5 и 6, импортирующий заглушку напрямую, не должен уметь провести
+    // покупку при выключенном PAYWALL_MODE в обход getProvider().
+    const { stub } = await freshWorld({ dbPath, mode: "off", secret: SECRET });
+
+    expect(stub.getStubProvider()).toBeNull();
   });
 
   it("verifyWebhook отказывает на теле, которое не разбирается в заказ", async () => {

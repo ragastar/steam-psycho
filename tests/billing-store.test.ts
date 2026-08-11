@@ -223,9 +223,72 @@ describe("недоступная база закрывает доступ, а н
       }),
     ).toBeNull();
     expect(billing.findOrder(1)).toBeNull();
-    expect(billing.markPaid(1, "provider-order-1")).toBe("unknown");
+    // Именно "unavailable", а не "unknown": недоступная база — это не «нет
+    // такого заказа». Вызывающий обязан ответить кассе 5xx и ждать повтора;
+    // на 404 касса перестанет повторять, и оплата потеряется.
+    expect(billing.markPaid(1, "provider-order-1")).toBe("unavailable");
+    expect(billing.markCancelled(1)).toBe("unavailable");
+    expect(billing.billingAvailable()).toBe(false);
     expect(billing.hasEntitlement(1, "76561197990915489")).toBe(false);
     expect(billing.findOpenOrder(1, "76561197990915489")).toBeNull();
+  });
+});
+
+describe("отмена заказа", () => {
+  async function createdOrder(key: string) {
+    const { identity, billing } = await freshStores(dbPath);
+    const accountId = makeAccount(identity);
+    const order = billing.createOrder({
+      accountId,
+      steamId64: "76561197990915489",
+      amountKop: 19900,
+      provider: "stub",
+      idempotencyKey: key,
+    });
+    return { billing, accountId, orderId: order!.id };
+  }
+
+  it("markCancelled закрывает незакрытый заказ и права не выдаёт", async () => {
+    const { billing, accountId, orderId } = await createdOrder("cancel-1");
+
+    expect(billing.markCancelled(orderId)).toBe("cancelled");
+    expect(billing.findOrder(orderId)!.status).toBe("cancelled");
+    expect(billing.hasEntitlement(accountId, "76561197990915489")).toBe(false);
+    expect(countEntitlements(dbPath)).toBe(0);
+  });
+
+  it("повторная отмена возвращает already и ничего не меняет", async () => {
+    const { billing, orderId } = await createdOrder("cancel-2");
+
+    expect(billing.markCancelled(orderId)).toBe("cancelled");
+    expect(billing.markCancelled(orderId)).toBe("already");
+    expect(billing.findOrder(orderId)!.status).toBe("cancelled");
+  });
+
+  it("оплаченный заказ отменить нельзя", async () => {
+    const { billing, accountId, orderId } = await createdOrder("cancel-3");
+    billing.markPaid(orderId, "provider-order-1");
+
+    // Деньги взяты и право выдано: отзыв доступа — работа руками через
+    // админку, а не тихая правка статуса по запоздавшему вебхуку.
+    expect(billing.markCancelled(orderId)).toBe("paid");
+    expect(billing.findOrder(orderId)!.status).toBe("paid");
+    expect(billing.hasEntitlement(accountId, "76561197990915489")).toBe(true);
+  });
+
+  it("отменённый заказ оплаченным уже не станет", async () => {
+    const { billing, accountId, orderId } = await createdOrder("cancel-4");
+    billing.markCancelled(orderId);
+
+    expect(billing.markPaid(orderId, "provider-order-1")).toBe("already");
+    expect(billing.findOrder(orderId)!.status).toBe("cancelled");
+    expect(billing.hasEntitlement(accountId, "76561197990915489")).toBe(false);
+  });
+
+  it("markCancelled неизвестного заказа возвращает unknown", async () => {
+    const { billing } = await freshStores(dbPath);
+
+    expect(billing.markCancelled(999999)).toBe("unknown");
   });
 });
 

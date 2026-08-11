@@ -6,6 +6,22 @@ import { getStubProvider } from "./stub-provider";
  * российские эквайеры устроены так же: подмена заглушки на боевую кассу будет
  * дешёвой, а остальной код о разнице знать не должен.
  */
+/**
+ * Что именно сообщила касса. Приход подтверждения сам по себе НЕ означает
+ * «оплачено»: тем же вебхуком касса сообщает и об отказе банка. И сумму она
+ * присылает фактическую — сверять её с заказом обязан тот, кто выдаёт право,
+ * иначе подтверждение об уплате одной копейки откроет разбор за 199 рублей.
+ */
+export interface VerifiedPayment {
+  orderId: number;
+  providerOrderId: string;
+  outcome: "paid" | "declined";
+  /** Сколько РЕАЛЬНО уплачено. Сверяется с orders.amount_kop. */
+  amountKop: number;
+  /** Валюта фактического платежа: 19900 тугриков — не 19900 копеек. */
+  currency: string;
+}
+
 export interface PaymentProvider {
   /** Пишется в заказ: поддельные заказы не должны смешаться с настоящими. */
   name: string;
@@ -19,8 +35,17 @@ export interface PaymentProvider {
    * считается по байтам, а не по разобранному и заново собранному JSON.
    * Любая осечка — null, то есть отказ.
    */
-  verifyWebhook(rawBody: string, signature: string | null): { orderId: number; providerOrderId: string } | null;
+  verifyWebhook(rawBody: string, signature: string | null): VerifiedPayment | null;
 }
+
+/**
+ * Короче этого секрет не принимаем. Подпись — единственное, что стоит между
+ * чужим человеком и бесплатным правом, а подбирают её локально: в сеть уходит
+ * один запрос на удачного кандидата. Короткий секрет — это отсутствие секрета,
+ * только незаметное. Образец такой проверки — getSecret в
+ * lib/identity/session.ts.
+ */
+export const MIN_WEBHOOK_SECRET_LENGTH = 32;
 
 /**
  * Заголовок, в котором касса присылает подпись. Живёт здесь, а не в файле

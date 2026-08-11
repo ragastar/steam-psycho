@@ -68,23 +68,33 @@ const stubProvider: PaymentProvider = {
     }
     if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return null;
 
-    const { orderId, providerOrderId } = payload as { orderId?: unknown; providerOrderId?: unknown };
+    const { orderId, providerOrderId, outcome, amountKop, currency } = payload as Record<string, unknown>;
     if (typeof orderId !== "number" || !Number.isInteger(orderId) || orderId <= 0) return null;
     if (typeof providerOrderId !== "string" || providerOrderId === "") return null;
+    // Неизвестный исход — это не «наверное, оплачено». Тело, молчащее о том,
+    // чем кончился платёж, обязано читаться как отказ.
+    if (outcome !== "paid" && outcome !== "declined") return null;
+    if (typeof amountKop !== "number" || !Number.isInteger(amountKop) || amountKop <= 0) return null;
+    if (typeof currency !== "string" || currency === "") return null;
 
-    return { orderId, providerOrderId };
+    return { orderId, providerOrderId, outcome, amountKop, currency };
   },
 };
 
 /**
- * Предохранитель: в боевом окружении поддельная касса не стартует сама.
- * Владелец включает приём ненастоящих денег на живом сайте осознанно — значит
- * переменная задаётся руками, а не подразумевается.
+ * Единственная дверь к поддельной кассе — и оба предохранителя стоят в ней, а
+ * не в getProvider(): обойти их, импортировав заглушку напрямую, не должно
+ * получаться ни у витрины покупки, ни у страницы оплаты.
  *
- * Проверка живёт здесь, а не только в getProvider(), чтобы обойти её было
- * нельзя: другого способа получить эту реализацию не существует.
+ * 1. Режим. `stub` и `off` — это одно значение на три положения, а не два
+ *    независимых флага: при выключенной кассе поддельной кассы не существует.
+ * 2. Боевое окружение. Приём ненастоящих денег на живом сайте владелец
+ *    включает осознанно — значит переменная задаётся руками, а не
+ *    подразумевается.
  */
 export function getStubProvider(): PaymentProvider | null {
+  if (process.env.PAYWALL_MODE !== "stub") return null;
+
   if (process.env.NODE_ENV === "production" && process.env.PAYWALL_ALLOW_STUB_IN_PROD !== "true") {
     console.error(
       "[billing] поддельная касса запрошена в боевом окружении без PAYWALL_ALLOW_STUB_IN_PROD=true — отказ",

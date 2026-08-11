@@ -47,6 +47,17 @@ function mapOrder(row: OrderRow): Order {
 }
 
 /**
+ * Отвечает ли база вообще. Нужна тем, кто получил null от findOrder и обязан
+ * различить «такого заказа нет» и «база не открылась»: первое — окончательный
+ * ответ, второе — беда на нашей стороне, на которую нельзя отвечать 404.
+ * База бывает недоступна СТОЙКО (неоткрываемый файл, упавшая миграция), и
+ * тогда «нет такого заказа» звучало бы приговором каждой оплате подряд.
+ */
+export function billingAvailable(): boolean {
+  return getBillingDb() !== null;
+}
+
+/**
  * Создаёт заказ или, если такой idempotencyKey уже встречался, возвращает
  * существующий. Защищает и от двойного нажатия кнопки «купить» (два запроса
  * с одним ключом), и от повторного создания при ретрае сети.
@@ -147,9 +158,15 @@ export function findOpenOrder(accountId: number, steamId64: string): Order | nul
  * уже стоит от другого заказа (см. INSERT OR IGNORE ниже), ответ всё равно
  * "granted" — заказ реально оплачен и переведён в paid.
  */
-export function markPaid(orderId: number, providerOrderId: string): "granted" | "already" | "unknown" {
+export function markPaid(
+  orderId: number,
+  providerOrderId: string,
+): "granted" | "already" | "unknown" | "unavailable" {
   const db = getBillingDb();
-  if (!db) return "unknown";
+  // "unavailable", а не "unknown": вызывающий обязан отличить «нет такого
+  // заказа» от «база не ответила». Первое кассе отвечают 404 и она перестаёт
+  // повторять, второе — 5xx, и оплата не теряется.
+  if (!db) return "unavailable";
 
   const attempt = db.transaction((): "granted" | "already" | "unknown" => {
     const row = db
@@ -182,7 +199,47 @@ export function markPaid(orderId: number, providerOrderId: string): "granted" | 
     return attempt();
   } catch (err) {
     console.error("[billing] подтверждение оплаты не удалось:", err);
-    return "unknown";
+    return "unavailable";
+  }
+}
+
+/**
+ * Отклонение платежа: заказ закрывается отказом и права не получает.
+ *
+ * Повадки те же, что у markPaid, и по тем же причинам: единственные ворота —
+ * условная запись `WHERE id = ? AND status = 'created'` и её `changes`, а не
+ * прочитанный заранее статус. Чтение ниже нужно только чтобы ОБЪЯСНИТЬ, почему
+ * записи не случилось, и на решение уже не влияет.
+ *
+ * Оплаченный заказ отменить нельзя: деньги взяты, право выдано, и отзыв
+ * доступа — это работа руками через админку, а не тихая правка статуса по
+ * запоздавшему вебхуку. Такой случай возвращает "paid", чтобы вызывающий мог
+ * сказать о расхождении вслух.
+ */
+export function markCancelled(orderId: number): "cancelled" | "already" | "paid" | "unknown" | "unavailable" {
+  const db = getBillingDb();
+  if (!db) return "unavailable";
+
+  const attempt = db.transaction((): "cancelled" | "already" | "paid" | "unknown" => {
+    const updated = db
+      .prepare("UPDATE orders SET status = 'cancelled' WHERE id = ? AND status = 'created'")
+      .run(orderId);
+
+    if (updated.changes === 1) return "cancelled";
+
+    const row = db.prepare("SELECT status FROM orders WHERE id = ?").get(orderId) as
+      | { status: OrderStatus }
+      | undefined;
+
+    if (!row) return "unknown";
+    return row.status === "paid" ? "paid" : "already";
+  });
+
+  try {
+    return attempt();
+  } catch (err) {
+    console.error("[billing] отмена заказа не удалась:", err);
+    return "unavailable";
   }
 }
 
