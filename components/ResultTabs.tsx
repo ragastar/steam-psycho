@@ -72,9 +72,11 @@ interface ResultTabsProps {
   profile: AggregatedProfile;
   steamId64: string;
   locale: string;
+  /** Владение проверено на сервере (accountOwnsSteamId) — здесь только рисуем бейдж. */
+  isOwner?: boolean;
 }
 
-export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsProps) {
+export function ResultTabs({ portrait, profile, steamId64, locale, isOwner = false }: ResultTabsProps) {
   const t = useTranslations();
   const [activeTab, setActiveTab] = useState("card");
 
@@ -155,8 +157,18 @@ export function ResultTabs({ portrait, profile, steamId64, locale }: ResultTabsP
         activeTab={activeTab}
         onTabChange={setActiveTab}
         /* Переключатель языка живёт внутри панели, а не поверх страницы:
-           иначе он накрывает правую вкладку и на телефоне до неё не дотянуться. */
-        rightSlot={<LocaleSwitcher />}
+           иначе он накрывает правую вкладку и на телефоне до неё не дотянуться.
+           Бейдж владельца — по той же причине, тем же уголком. */
+        rightSlot={
+          <div className="flex items-center gap-2">
+            {isOwner && (
+              <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
+                {t("result.yourProfile")}
+              </span>
+            )}
+            <LocaleSwitcher />
+          </div>
+        }
       />
 
       <div className="max-w-3xl mx-auto px-4 py-6">

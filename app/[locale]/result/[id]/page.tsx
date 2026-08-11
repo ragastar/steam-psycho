@@ -12,6 +12,8 @@ import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
 import { getAccessLevel } from "@/lib/access/entitlement";
 import { toTeaserProfile } from "@/lib/access/redact";
+import { getCurrentAccountId } from "@/lib/identity/session";
+import { accountOwnsSteamId } from "@/lib/identity/store";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
 
 interface Props {
@@ -58,11 +60,22 @@ export default async function ResultPage({ params: rawParams }: Props) {
   // профиль в браузер не уезжают — раньше они уходили целиком и лишь размывались.
   const access = await getAccessLevel(params.id);
 
+  // Владение доказывает ТОЛЬКО подтверждённая привязка Steam. Вход через
+  // Telegram или любая ошибка здесь означают «не владелец» — ошибка не
+  // повышает права, только понижает.
+  const currentAccountId = await getCurrentAccountId();
+  const isOwner = currentAccountId ? accountOwnsSteamId(currentAccountId, params.id) : false;
+
   if (access !== "full" && profile) {
     const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
     return (
       <div className="min-h-screen">
-        <div className="absolute top-4 right-4 z-30">
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+          {isOwner && (
+            <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
+              {t("result.yourProfile")}
+            </span>
+          )}
           <LocaleSwitcher />
         </div>
         <TeaserPage
@@ -83,7 +96,12 @@ export default async function ResultPage({ params: rawParams }: Props) {
     if (cachedStats && cachedRarity) {
       return (
         <div className="min-h-screen">
-          <div className="absolute top-4 right-4 z-30">
+          <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+            {isOwner && (
+              <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
+                {t("result.yourProfile")}
+              </span>
+            )}
             <LocaleSwitcher />
           </div>
           <TeaserPage
@@ -131,12 +149,13 @@ export default async function ResultPage({ params: rawParams }: Props) {
     <div className="min-h-screen">
       {/* Переключатель языка отрисовывает сама панель вкладок: отдельным
           плавающим блоком он накрывал правую вкладку, и на телефоне нажать её
-          было нельзя. */}
+          было нельзя. Бейдж владельца едет тем же путём, рядом с ним. */}
       <ResultTabs
         portrait={portrait}
         profile={profile}
         steamId64={params.id}
         locale={params.locale}
+        isOwner={isOwner}
       />
 
       {/* Actions */}

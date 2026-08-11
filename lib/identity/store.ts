@@ -74,3 +74,16 @@ export function loginOrCreate(
 
   return { status: "ok", accountId };
 }
+
+/**
+ * Владение — это ПОДТВЕРЖДЁННАЯ привязка Steam, и только она. Вход через
+ * Telegram владельцем не делает: сказать «это мой аккаунт» может кто угодно.
+ */
+export function accountOwnsSteamId(accountId: number, steamId64: string): boolean {
+  const row = getIdentityDb()
+    .prepare(
+      "SELECT 1 FROM identities WHERE account_id = ? AND provider = 'steam' AND provider_id = ? AND verified = 1",
+    )
+    .get(accountId, steamId64);
+  return row !== undefined;
+}
