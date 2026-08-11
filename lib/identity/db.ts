@@ -14,13 +14,34 @@ const DB_PATH =
 
 let db: Database.Database | null = null;
 
-export function getIdentityDb(): Database.Database {
+/**
+ * Возвращает null, если базу открыть не удалось, — как `lib/analytics/db.ts`.
+ *
+ * Личность нужна странице результата ради одного бейджа «твой профиль».
+ * Пусть беда с базой стоит бейджа, а не всей страницы: раньше исключение
+ * отсюда превращалось в 500 на главной странице продукта, которая до этого
+ * от состояния базы не зависела вовсе. Отсутствие базы читается как
+ * «ничего не знаем про этого человека» — то есть прав не прибавляет.
+ */
+export function getIdentityDb(): Database.Database | null {
   if (db) return db;
-  db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("busy_timeout = 5000");
-  migrate(db);
-  return db;
+  try {
+    const opened = new Database(DB_PATH);
+    opened.pragma("journal_mode = WAL");
+    opened.pragma("busy_timeout = 5000");
+    // Ссылочная целостность: account_id в identities приходит в конечном
+    // счёте из куки, и без этого SQLite молча примет привязку к аккаунту,
+    // которого нет.
+    opened.pragma("foreign_keys = ON");
+    migrate(opened);
+    // Присваиваем только после успешной миграции: иначе полуоткрытая база
+    // закешируется и все дальнейшие запросы будут падать на ней.
+    db = opened;
+    return db;
+  } catch (err) {
+    console.error("[identity] не удалось открыть SQLite:", err);
+    return null;
+  }
 }
 
 function migrate(db: Database.Database): void {

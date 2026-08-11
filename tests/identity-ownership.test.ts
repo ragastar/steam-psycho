@@ -54,4 +54,12 @@ describe("владение профилем", () => {
 
     expect(store.accountOwnsSteamId(accountId, "76561197990915489")).toBe(false);
   });
+  it("недоступная база означает «не владелец», а не падение страницы", async () => {
+    // Страница результата спрашивает владение ради одного бейджа. Раньше
+    // открытие базы не было обёрнуто в try/catch, и любая беда с ней
+    // превращалась в 500 на главной странице продукта.
+    const store = await freshStore("/nonexistent-dir-для-теста/identity.db");
+
+    expect(store.accountOwnsSteamId(1, "76561197990915489")).toBe(false);
+  });
 });

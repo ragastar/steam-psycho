@@ -62,7 +62,9 @@ export default async function ResultPage({ params: rawParams }: Props) {
 
   // Владение доказывает ТОЛЬКО подтверждённая привязка Steam. Вход через
   // Telegram или любая ошибка здесь означают «не владелец» — ошибка не
-  // повышает права, только понижает.
+  // повышает права, только понижает. Обещание держит сам слой личности:
+  // недоступная база отдаёт false (lib/identity/db.ts), а не исключение,
+  // иначе беда с базой превращалась бы в 500 на главной странице продукта.
   const currentAccountId = await getCurrentAccountId();
   const isOwner = currentAccountId ? accountOwnsSteamId(currentAccountId, params.id) : false;
 

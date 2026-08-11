@@ -84,4 +84,34 @@ describe("хранилище личности", () => {
 
     expect(store.findAccountByIdentity("steam", "76561197990915489")).toBe(accountId);
   });
+  it("аккаунт из куки, которого нет в базе, не рождает висячую привязку", async () => {
+    const store = await freshStore(dbPath);
+
+    // Кука сессии пережила базу (переезд, чистка). Раньше привязка спокойно
+    // ложилась на несуществующий аккаунт: PRAGMA foreign_keys был выключен.
+    // Теперь такой аккаунт считается небывшим и заводится новый.
+    const res = store.loginOrCreate("telegram", "12345", { currentAccountId: 4242 });
+
+    expect(res.status).toBe("ok");
+    expect(res.status === "ok" && res.accountId).not.toBe(4242);
+    expect(store.listIdentities(4242)).toEqual([]);
+  });
+});
+
+describe("недоступная база закрывает вход, а не открывает", () => {
+  /** Путь, который нельзя открыть: каталога не существует. */
+  const brokenPath = "/nonexistent-dir-для-теста/identity.db";
+
+  it("вход не состоится и молча не пустит", async () => {
+    const store = await freshStore(brokenPath);
+
+    expect(store.loginOrCreate("telegram", "12345")).toEqual({ status: "unavailable" });
+  });
+
+  it("привязок у аккаунта не видно, но и падения нет", async () => {
+    const store = await freshStore(brokenPath);
+
+    expect(store.listIdentities(1)).toEqual([]);
+    expect(store.findAccountByIdentity("telegram", "12345")).toBeNull();
+  });
 });
