@@ -26,6 +26,14 @@ export function gateTokenKey(token: string): string {
   return `gate:${token}`;
 }
 
+/**
+ * Токен входа через Telegram. Отдельный от гейт-токена: у гейта другой смысл
+ * («подписан ли на канал») и другой жизненный цикл.
+ */
+export function loginTokenKey(token: string): string {
+  return `login:${token}`;
+}
+
 export function cardStatsKey(steamId64: string): string {
   return `cardstats:v1:${steamId64}`;
 }

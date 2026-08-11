@@ -63,6 +63,13 @@ function sqliteGet<T>(key: string): T | null {
   }
 }
 
+function sqliteDelete(key: string): void {
+  ensureGateTable();
+  const db = getDb();
+  if (!db) return;
+  db.prepare("DELETE FROM gate_tokens WHERE key = ?").run(key);
+}
+
 function sqliteSet(key: string, value: unknown, ttlSeconds: number): void {
   try {
     ensureGateTable();
@@ -182,6 +189,17 @@ export async function setCache<T>(key: string, value: T, ttlSeconds: number): Pr
   } catch {
     // ignore
   }
+}
+
+export async function deleteCache(key: string): Promise<void> {
+  memoryCache.delete(key);
+  try {
+    sqliteDelete(key);
+  } catch (err) {
+    console.error("[cache] deleteCache failed:", err);
+  }
+  const client = getRedis();
+  if (client) await client.del(key);
 }
 
 export async function getCache<T>(key: string): Promise<T | null> {

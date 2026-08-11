@@ -2,7 +2,7 @@ import type { Api } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { getBot } from "./bot";
 import { getCache, setCache } from "@/lib/cache/redis";
-import { CACHE_TTL, gateTokenKey } from "@/lib/cache/keys";
+import { CACHE_TTL, gateTokenKey, loginTokenKey } from "@/lib/cache/keys";
 import { logGateEvent } from "@/lib/analytics/db";
 import { SITE_HOST } from "@/lib/site";
 
@@ -48,6 +48,8 @@ const MESSAGES = {
     checkButton: "Я подписался ✅",
     expired: "Ссылка устарела. Открой портрет на сайте заново.",
     error: "Что-то пошло не так. Попробуй ещё раз.",
+    loginDone: "Готово, вход выполнен. Возвращайся на сайт — страница сама обновится.",
+    loginExpired: "Ссылка входа устарела. Нажми «Войти» на сайте ещё раз.",
   },
   en: {
     unlocked: "✅ Portrait unlocked! Go back to the site — it's already updated.",
@@ -55,6 +57,8 @@ const MESSAGES = {
     checkButton: "I've subscribed ✅",
     expired: "This link has expired. Open your portrait on the site again.",
     error: "Something went wrong. Please try again.",
+    loginDone: "You're signed in. Head back to the site — the page will update itself.",
+    loginExpired: "This sign-in link has expired. Tap “Sign in” on the site again.",
   },
 } as const;
 
@@ -67,15 +71,25 @@ export function registerHandlers() {
   handlersRegistered = true;
 
   bot.command("start", async (ctx) => {
-    const token = ctx.match?.trim();
-    if (!token) {
+    const payload = ctx.match?.trim();
+    if (!payload) {
       console.log("[gate] /start without token, showing WELCOME");
       await ctx.reply(WELCOME);
       return;
     }
 
-    console.log("[gate] /start with token:", token.slice(0, 8) + "...", "user:", ctx.from?.id);
-    await handleGateCheck(ctx.api, ctx.from!.id, token, (text, opts) => ctx.reply(text, opts));
+    // Токен ВХОДА и токен ГЕЙТА живут в разных ключах и означают разное.
+    // Приставка — единственное, что их различает в ссылке t.me.
+    if (payload.startsWith("login_")) {
+      const userId = ctx.from?.id;
+      if (!userId) return;
+      const outcome = await handleLoginStart(userId, payload.slice("login_".length));
+      await ctx.reply(outcome === "ok" ? MESSAGES.ru.loginDone : MESSAGES.ru.loginExpired);
+      return;
+    }
+
+    console.log("[gate] /start с токеном:", payload.slice(0, 8) + "...", "user:", ctx.from?.id);
+    await handleGateCheck(ctx.api, ctx.from!.id, payload, (text, opts) => ctx.reply(text, opts));
   });
 
   // Inline button "I've subscribed" callback
@@ -96,6 +110,13 @@ export function registerHandlers() {
     });
     await ctx.answerCallbackQuery();
   });
+}
+
+export async function handleLoginStart(userId: number, token: string): Promise<"ok" | "expired"> {
+  const data = await getCache<{ status: string }>(loginTokenKey(token));
+  if (!data) return "expired";
+  await setCache(loginTokenKey(token), { status: "confirmed", telegramUserId: String(userId) }, 600);
+  return "ok";
 }
 
 async function handleGateCheck(
