@@ -345,5 +345,14 @@
   },
   "footer": {
     "disclaimer": "Entertainment content. Not a medical or psychological assessment. Not affiliated with Valve Corporation."
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "viaTelegram": "With Telegram",
+    "viaSteam": "With Steam",
+    "waiting": "Waiting for confirmation in Telegram…",
+    "signedIn": "You're signed in",
+    "taken": "This login is already linked to another account. Sign in with it, or unlink it there first.",
+    "failed": "Sign-in failed. Please try again."
   }
 }
