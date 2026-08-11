@@ -44,4 +44,14 @@ describe("владение профилем", () => {
 
     expect(store.accountOwnsSteamId(accountId, "76561198028121353")).toBe(false);
   });
+
+  it("неподтверждённая привязка Steam владельцем не делает", async () => {
+    const store = await freshStore(dbPath);
+    // verified: false явно, а не пропуск opts — так честнее видно намерение
+    // теста: привязка ЕСТЬ, но владение ею не доказано.
+    const res = store.loginOrCreate("steam", "76561197990915489", { verified: false });
+    const accountId = res.status === "ok" ? res.accountId : 0;
+
+    expect(store.accountOwnsSteamId(accountId, "76561197990915489")).toBe(false);
+  });
 });
