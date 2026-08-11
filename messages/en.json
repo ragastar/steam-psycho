@@ -353,6 +353,7 @@
     "waiting": "Waiting for confirmation in Telegram…",
     "signedIn": "You're signed in",
     "taken": "This login is already linked to another account. Sign in with it, or unlink it there first.",
-    "failed": "Sign-in failed. Please try again."
+    "failed": "Sign-in failed. Please try again.",
+    "timedOut": "We didn't get confirmation in time. Tap \"Sign in\" again."
   }
 }
