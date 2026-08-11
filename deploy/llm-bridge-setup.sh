@@ -68,20 +68,21 @@ fi
 umask 077
 # Бюджеты ожидания ВЛОЖЕНЫ друг в друга, а не равны:
 #   nginx proxy_read_timeout         180000  (снаружи, не в этом репозитории)
-#   > CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS 115000  (обе попытки моста вместе)
-#   > CLAUDE_BRIDGE_TIMEOUT_MS       110000  (одна попытка, у клиента)
-#   > BRIDGE_TIMEOUT_MS              100000  (дочерний claude, здесь)
+#   > CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS 165000  (обе попытки моста вместе)
+#   > CLAUDE_BRIDGE_TIMEOUT_MS       160000  (одна попытка, у клиента)
+#   > BRIDGE_TIMEOUT_MS              150000  (дочерний claude, здесь)
 # Смысл: когда сессия протухла и claude молчит, мост обязан вернуть 502
 # РАНЬШЕ, чем клиент оборвёт запрос, а клиент — раньше, чем nginx отдаст 504.
-# Иначе запасной платный ключ не успевает сработать ни разу.
-# 100000 — измеренное значение: боевая карточка заняла 77 секунд.
+# 150000 подняли со 100000 2026-08-11: 100с выведены из одного замера в 77с,
+# а боевая генерация заняла 93,4с и на повторе перешагнула сотню — процесс
+# убивали на полуслове, посетитель видел витрину вместо карточки.
 cat > "$ENV_FILE" <<EOF
 BRIDGE_HOST=$HOST_IP
 BRIDGE_PORT=$PORT
 BRIDGE_TOKEN=$TOKEN
 BRIDGE_MAX_CONCURRENT=${BRIDGE_MAX_CONCURRENT:-2}
 BRIDGE_QUEUE_MAX=${BRIDGE_QUEUE_MAX:-4}
-BRIDGE_TIMEOUT_MS=${BRIDGE_TIMEOUT_MS:-100000}
+BRIDGE_TIMEOUT_MS=${BRIDGE_TIMEOUT_MS:-150000}
 BRIDGE_HEALTH_TTL_MS=${BRIDGE_HEALTH_TTL_MS:-60000}
 BRIDGE_HEALTH_TIMEOUT_MS=${BRIDGE_HEALTH_TIMEOUT_MS:-30000}
 BRIDGE_MODEL=${BRIDGE_MODEL:-claude-sonnet-5}
@@ -112,8 +113,8 @@ fi
 {
   echo "CLAUDE_BRIDGE_ENDPOINT=http://$HOST_IP:$PORT/generate"
   echo "CLAUDE_BRIDGE_TOKEN=$TOKEN"
-  echo "CLAUDE_BRIDGE_TIMEOUT_MS=${CLAUDE_BRIDGE_TIMEOUT_MS:-110000}"
-  echo "CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS=${CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS:-115000}"
+  echo "CLAUDE_BRIDGE_TIMEOUT_MS=${CLAUDE_BRIDGE_TIMEOUT_MS:-160000}"
+  echo "CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS=${CLAUDE_BRIDGE_TOTAL_TIMEOUT_MS:-165000}"
 } >> "$PROJ_ENV"
 echo "✓ $PROJ_ENV"
 

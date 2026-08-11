@@ -326,10 +326,16 @@
     "feature4": "AI art — your gaming spirit visualized",
     "feature5": "Analytics that'll blow your mind",
     "generating": "Generating your AI portrait...",
-    "generatingHint": "Usually 10-15 seconds, hang tight",
+    "generatingHint": "This takes about a minute and a half — keep the tab open",
     "games": "games",
     "hours": "hours",
-    "level": "level"
+    "level": "level",
+    "failed": "Couldn't build your card",
+    "failedHint": "The AI didn't answer in time. Your Steam data is already collected — hit retry, the second run usually goes through.",
+    "retry": "Try again",
+    "expired": "Your Steam data expired",
+    "expiredHint": "The analysis timed out while the card was being built. Run it again — it's quick.",
+    "reanalyze": "Analyze again"
   },
   "gate": {
     "title": "Unlock Your Full Card",

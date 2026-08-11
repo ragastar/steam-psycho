@@ -97,6 +97,72 @@ describe("поставщик через мост к подписке", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  /**
+   * Медленный мост: отвечает через delayMs, но честно срывается по сигналу
+   * отмены — как настоящий fetch. Без этого потолок нечем проверить: обычный
+   * мок отвечает мгновенно, и до отмены дело не доходит.
+   */
+  function slowReply(body: unknown, delayMs: number) {
+    return vi.fn((_url: string, init: RequestInit) => new Promise<Response>((resolve, reject) => {
+      const timer = setTimeout(() => resolve(reply(body)), delayMs);
+      init.signal?.addEventListener("abort", () => {
+        clearTimeout(timer);
+        const err = new Error("прервано");
+        err.name = "AbortError";
+        reject(err);
+      });
+    }));
+  }
+
+  it("ждёт карточку дольше двух минут: боевая генерация занимает ~95с", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("fetch", slowReply({ text: JSON.stringify(VALID) }, 130_000));
+
+      const pending = generateWithBridge("система", "запрос");
+      await vi.advanceTimersByTimeAsync(140_000);
+
+      await expect(pending).resolves.toMatchObject({
+        portrait: { quote: "Купил, но не сыграл" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("но не дольше окна nginx: на 170с сдаётся сам", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("fetch", slowReply({ text: JSON.stringify(VALID) }, 170_000));
+
+      const pending = generateWithBridge("система", "запрос");
+      const assertion = expect(pending).rejects.toThrow(/таймаут/);
+      await vi.advanceTimersByTimeAsync(175_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("не переспрашивает, когда на вторую генерацию времени уже нет", async () => {
+    vi.useFakeTimers();
+    try {
+      // Мусор пришёл поздно: остатка хватило бы на переспрос по старой мерке
+      // (30с), но не на настоящую генерацию — значит переспрашивать нечем.
+      const fetchMock = slowReply({ text: "извини, не могу" }, 90_000);
+      vi.stubGlobal("fetch", fetchMock);
+
+      const pending = generateWithBridge("система", "запрос");
+      const assertion = expect(pending).rejects.toThrow(/времени на переспрос не осталось/);
+      await vi.advanceTimersByTimeAsync(100_000);
+      await assertion;
+
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("системный и пользовательский промпт идут в разные поля", async () => {
     const fetchMock = vi.fn().mockResolvedValue(reply({ text: JSON.stringify(VALID) }));
     vi.stubGlobal("fetch", fetchMock);
