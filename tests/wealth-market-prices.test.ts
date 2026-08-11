@@ -56,4 +56,15 @@ describe("прайс-лист рынка", () => {
     const { getMarketPrices } = await import("@/lib/wealth/market-prices");
     expect(await getMarketPrices(730)).toBeNull();
   });
+
+  it("предмет с ценой ровно 0 попадает в карту, а не выбрасывается", async () => {
+    const itemsWithZero = [
+      { market_hash_name: "Фриби", suggested_price: 0, median_price: 0.5, min_price: 0.3 },
+    ];
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(itemsWithZero), { status: 200 }));
+    const { getMarketPrices } = await import("@/lib/wealth/market-prices");
+    const prices = await getMarketPrices(730);
+    expect(prices?.["Фриби"]).toBe(0);
+    expect(prices).toHaveProperty("Фриби");
+  });
 });

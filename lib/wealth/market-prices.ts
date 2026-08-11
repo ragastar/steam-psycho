@@ -45,7 +45,7 @@ export async function getMarketPrices(appId: number): Promise<Record<string, num
       const prices: Record<string, number> = {};
       for (const item of items) {
         const price = item.suggested_price ?? item.median_price ?? item.min_price;
-        if (price) prices[item.market_hash_name] = price;
+        if (price != null) prices[item.market_hash_name] = price;
       }
       return prices;
     } catch {
