@@ -20,8 +20,10 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+      # Один вызов вместо переписанного здесь списка шагов: пока CI дублировал
+      # состав проверок, из него незаметно выпал линтер, и сломанный npm run
+      # lint прожил целый апгрейд Next никем не замеченным.
+      - run: npm run verify
 
   deploy:
     needs: verify
