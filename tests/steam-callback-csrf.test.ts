@@ -35,11 +35,20 @@ function stubValidFetch() {
  * /start, и подписан целиком (в тесте подпись не проверяется по-настоящему —
  * это делает замоканный fetch, — важна форма запроса).
  */
-function callbackRequest(opts: { returnToState?: string; cookieState?: string }): Request {
+function callbackRequest(opts: {
+  returnToState?: string;
+  cookieState?: string;
+  /** Сырой заголовок Cookie — для проверки границ имени куки. */
+  rawCookie?: string;
+  locale?: string;
+}): Request {
+  const query = new URLSearchParams();
+  if (opts.returnToState !== undefined) query.set("state", opts.returnToState);
+  if (opts.locale !== undefined) query.set("locale", opts.locale);
   const returnTo =
-    opts.returnToState === undefined
+    query.size === 0
       ? "https://zadrotometr.ru/api/auth/steam/callback"
-      : `https://zadrotometr.ru/api/auth/steam/callback?state=${opts.returnToState}`;
+      : `https://zadrotometr.ru/api/auth/steam/callback?${query.toString()}`;
 
   const params = new URLSearchParams({
     "openid.ns": "http://specs.openid.net/auth/2.0",
@@ -52,7 +61,9 @@ function callbackRequest(opts: { returnToState?: string; cookieState?: string })
   });
 
   const headers = new Headers();
-  if (opts.cookieState !== undefined) {
+  if (opts.rawCookie !== undefined) {
+    headers.set("cookie", opts.rawCookie);
+  } else if (opts.cookieState !== undefined) {
     headers.set("cookie", `steam_state=${opts.cookieState}`);
   }
 
@@ -115,5 +126,54 @@ describe("защита возврата из Steam от Login CSRF", () => {
 
     expect(res.headers.get("location")).toContain("login=failed");
     expect(res.cookies.get("gt_session")).toBeUndefined();
+  });
+  it("кука с похожим именем меткой не считается", async () => {
+    stubValidFetch();
+    const { GET } = await freshCallback(dbPath);
+
+    // xsteam_state — не steam_state. Нестрогая регулярка без границы имени
+    // считала бы иначе, и защита от подсунутой ссылки обходилась бы одной
+    // лишней кукой.
+    const res = await GET(
+      callbackRequest({ returnToState: "secret123", rawCookie: "xsteam_state=secret123" }),
+    );
+
+    expect(res.headers.get("location")).toContain("login=failed");
+    expect(res.cookies.get("gt_session")).toBeUndefined();
+  });
+});
+
+describe("язык переживает поход в Steam", () => {
+  it("вход, начатый на английской версии, возвращает на английскую", async () => {
+    stubValidFetch();
+    const { GET } = await freshCallback(dbPath);
+
+    const res = await GET(
+      callbackRequest({ returnToState: "secret123", cookieState: "secret123", locale: "en" }),
+    );
+
+    expect(res.headers.get("location")).toBe("https://zadrotometr.ru/en?login=ok");
+  });
+
+  it("отказ тоже возвращает на язык, с которого начинали", async () => {
+    stubValidFetch();
+    const { GET } = await freshCallback(dbPath);
+
+    const res = await GET(callbackRequest({ returnToState: "someone-elses-mark", cookieState: "secret123", locale: "en" }));
+
+    expect(res.headers.get("location")).toBe("https://zadrotometr.ru/en?login=failed");
+  });
+
+  it("незнакомый язык в адресе возврата подменяется языком по умолчанию", async () => {
+    stubValidFetch();
+    const { GET } = await freshCallback(dbPath);
+
+    // Список языков закрытый: подставить в подписанный адрес свой «язык»
+    // и увести человека на чужой адрес нельзя.
+    const res = await GET(
+      callbackRequest({ returnToState: "secret123", cookieState: "secret123", locale: "//evil.example" }),
+    );
+
+    expect(res.headers.get("location")).toBe("https://zadrotometr.ru/ru?login=ok");
   });
 });

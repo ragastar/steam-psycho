@@ -7,6 +7,24 @@ const STEAM_OPENID = "https://steamcommunity.com/openid/login";
 const IDENTIFIER_SELECT = "http://specs.openid.net/auth/2.0/identifier_select";
 const CLAIMED_ID_PREFIX = "https://steamcommunity.com/openid/id/";
 
+/**
+ * Имя куки с одноразовой меткой входа через Steam. Нужно и на /start, и на
+ * /callback, а из файла маршрута экспортировать можно только обработчик и
+ * runtime — поэтому имя живёт здесь, в одном экземпляре.
+ */
+export const STEAM_STATE_COOKIE = "steam_state";
+
+/**
+ * Поля, которые обязаны быть ПОДПИСАНЫ.
+ *
+ * claimed_id — это и есть ответ на вопрос «кто вошёл»; return_to несёт метку
+ * от Login CSRF. Оба читаются из параметров запроса, то есть из адресной
+ * строки, которую пишет браузер. Подпись проверяет только те поля, что
+ * перечислены в openid.signed: не перечислено — не проверено, и подменить
+ * его может кто угодно, оставив подпись действительной.
+ */
+const REQUIRED_SIGNED_FIELDS = ["claimed_id", "return_to"];
+
 export function buildAuthUrl(returnTo: string, realm: string): string {
   const params = new URLSearchParams({
     "openid.ns": "http://specs.openid.net/auth/2.0",
@@ -27,6 +45,9 @@ export function buildAuthUrl(returnTo: string, realm: string): string {
  * ошибка, чужой адрес личности, is_valid:false — это отказ, а не пропуск.
  */
 export async function verifyAssertion(params: URLSearchParams): Promise<string | null> {
+  const signed = (params.get("openid.signed") || "").split(",").map((f) => f.trim());
+  if (!REQUIRED_SIGNED_FIELDS.every((field) => signed.includes(field))) return null;
+
   const claimedId = params.get("openid.claimed_id") || "";
   if (!claimedId.startsWith(CLAIMED_ID_PREFIX)) return null;
 

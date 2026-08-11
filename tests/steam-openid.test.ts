@@ -5,14 +5,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function assertion(claimedId: string): URLSearchParams {
+function assertion(claimedId: string, signed?: string): URLSearchParams {
   return new URLSearchParams({
     "openid.ns": "http://specs.openid.net/auth/2.0",
     "openid.mode": "id_res",
     "openid.claimed_id": claimedId,
     "openid.identity": claimedId,
+    "openid.return_to": "https://zadrotometr.ru/api/auth/steam/callback?state=метка",
     "openid.sig": "подпись",
-    "openid.signed": "signed,op_endpoint,claimed_id,identity",
+    "openid.signed": signed ?? "signed,op_endpoint,claimed_id,identity,return_to",
   });
 }
 
@@ -71,6 +72,37 @@ describe("вход через Steam", () => {
 
     expect(
       await verifyAssertion(assertion("https://steamcommunity.com/openid/id/76561197990915489")),
+    ).toBeNull();
+  });
+  it("claimed_id вне списка подписанных полей не принимается", async () => {
+    // openid.signed перечисляет, ЧТО именно подписано. Не перечислено —
+    // не проверено: подпись остаётся действительной, а личность в адресе
+    // может быть чужой.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "is_valid:true\n",
+    }));
+
+    expect(
+      await verifyAssertion(
+        assertion("https://steamcommunity.com/openid/id/76561197990915489", "signed,op_endpoint,identity,return_to"),
+      ),
+    ).toBeNull();
+  });
+
+  it("return_to вне списка подписанных полей не принимается", async () => {
+    // На return_to держится защита от Login CSRF: метка читается именно
+    // оттуда, потому что это поле подписано. Не подписано — метка ничего
+    // не доказывает, и проверять её бессмысленно.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => "is_valid:true\n",
+    }));
+
+    expect(
+      await verifyAssertion(
+        assertion("https://steamcommunity.com/openid/id/76561197990915489", "signed,op_endpoint,claimed_id,identity"),
+      ),
     ).toBeNull();
   });
 });

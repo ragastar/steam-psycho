@@ -1,44 +1,45 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
-import { verifyAssertion } from "@/lib/identity/steam-openid";
+import { verifyAssertion, STEAM_STATE_COOKIE } from "@/lib/identity/steam-openid";
 import { loginOrCreate } from "@/lib/identity/store";
-import { issueSessionCookie, verifySessionValue } from "@/lib/identity/session";
+import {
+  CLEAR_COOKIE_OPTIONS,
+  issueSessionCookie,
+  readCookie,
+  readSessionFromRequest,
+  timingSafeEqualStrings,
+} from "@/lib/identity/session";
+import { normalizeLocale } from "@/lib/locale";
+import { defaultLocale } from "@/i18n/request";
 import { SITE_URL } from "@/lib/site";
 
-/** То же имя куки, что в /start. Экспортировать нельзя — см. правило там. */
-const STATE_COOKIE = "steam_state";
-
-function loginFailed() {
-  return NextResponse.redirect(`${SITE_URL}/ru?login=failed`);
-}
-
 /**
- * Достаёт метку из openid.return_to, а не из отдельного параметра адреса.
+ * Достаёт значение из openid.return_to, а не из отдельного параметра адреса.
  *
  * openid.return_to — то самое поле, которое Steam подписывает и возвращает
- * без изменений (оно входит в openid.signed, и check_authentication его
- * проверяет). Если тянуть метку из произвольного параметра запроса рядом с
- * openid.*, её ничто не защищает от подмены — читать нужно именно то
- * значение, что подтверждено подписью.
+ * без изменений (verifyAssertion требует, чтобы оно входило в openid.signed,
+ * и check_authentication его проверяет). Если тянуть метку из произвольного
+ * параметра запроса рядом с openid.*, её ничто не защищает от подмены —
+ * читать нужно именно то значение, что подтверждено подписью.
  */
-function extractStateFromReturnTo(params: URLSearchParams): string | null {
+function fromReturnTo(params: URLSearchParams, name: string): string | null {
   const returnTo = params.get("openid.return_to");
   if (!returnTo) return null;
   try {
-    return new URL(returnTo).searchParams.get("state");
+    return new URL(returnTo).searchParams.get(name);
   } catch {
     return null;
   }
 }
 
-function timingSafeEqualStrings(a: string, b: string): boolean {
-  // timingSafeEqual падает на разной длине, поэтому длину проверяем заранее.
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
-
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
+
+  // Язык, с которого начинали вход, приехал в подписанном адресе возврата.
+  // Отказные ветки ниже срабатывают ДО проверки подписи, поэтому здесь
+  // значение ещё не доказано — но выбор ограничен списком языков, так что
+  // худшее, что может сделать подделка, — увести человека на свой язык.
+  const locale = normalizeLocale(fromReturnTo(params, "locale")) ?? defaultLocale;
+  const home = (outcome: string) => NextResponse.redirect(`${SITE_URL}/${locale}?login=${outcome}`);
 
   // Защита от Login CSRF (session fixation): подписанная Steam'ом ссылка
   // возврата сама по себе ничего не доказывает про то, КТО её открыл —
@@ -46,40 +47,44 @@ export async function GET(req: Request) {
   // разослать её жертвам. Без сверки метки, выданной именно этому браузеру
   // на /start, чужая ссылка входит под чужим аккаунтом в сессию того, кто
   // её открыл. Ошибка любого рода здесь — отказ.
-  const cookieState = req.headers.get("cookie")?.match(/steam_state=([^;]+)/)?.[1];
-  const urlState = extractStateFromReturnTo(params);
+  const cookieState = readCookie(req.headers.get("cookie"), STEAM_STATE_COOKIE);
+  const urlState = fromReturnTo(params, "state");
   const stateOk = !!cookieState && !!urlState && timingSafeEqualStrings(cookieState, urlState);
 
   if (!stateOk) {
-    return loginFailed();
+    return home("failed");
   }
 
   // Метка одноразовая: она подтверждена, второй раз её проверять незачем и
   // небезопасно оставлять — гасим куку на любом исходе ниже.
   const clearState = (res: NextResponse) => {
-    res.cookies.set(STATE_COOKIE, "", { path: "/", maxAge: 0 });
+    res.cookies.set(STEAM_STATE_COOKIE, "", CLEAR_COOKIE_OPTIONS);
     return res;
   };
 
   const steamId = await verifyAssertion(params);
 
   if (!steamId) {
-    return clearState(loginFailed());
+    return clearState(home("failed"));
   }
 
-  const current = verifySessionValue(req.headers.get("cookie")?.match(/gt_session=([^;]+)/)?.[1]);
+  const current = readSessionFromRequest(req);
   // Вход через Steam доказывает владение аккаунтом (проверка в
   // steam-openid.ts), поэтому привязка создаётся сразу подтверждённой —
   // в отличие от Telegram, где ничего не доказано.
   const result = loginOrCreate("steam", steamId, { currentAccountId: current, verified: true });
 
   if (result.status === "taken") {
-    return clearState(NextResponse.redirect(`${SITE_URL}/ru?login=taken`));
+    return clearState(home("taken"));
+  }
+  if (result.status === "unavailable") {
+    // База не ответила — сессию не выдаём. Ошибка закрывает, а не открывает.
+    return clearState(home("failed"));
   }
 
   const cookie = issueSessionCookie(result.accountId);
-  const res = NextResponse.redirect(`${SITE_URL}/ru?login=ok`);
-  res.cookies.set(cookie.name, cookie.value, cookie.options as Parameters<typeof res.cookies.set>[2]);
+  const res = home("ok");
+  res.cookies.set(cookie.name, cookie.value, cookie.options);
   return clearState(res);
 }
 
