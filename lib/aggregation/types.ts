@@ -51,6 +51,12 @@ export interface AggregatedProfile {
     perHourCost: number;
     bestDeal: { name: string; pricePerHour: number } | null;
     freePercentage: number;
+    // Необязательные поля: под ключом profile:v2: лежат вечные записи
+    // покупателей, старые записи без этих полей обязаны продолжать читаться.
+    currency?: "RUB";
+    pricedGames?: number;
+    estimatedGames?: number;
+    unknownGames?: number;
   };
   platforms: {
     // Steam не отдаёт время на Steam Deck отдельно от Linux, поэтому Deck

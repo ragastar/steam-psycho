@@ -30,6 +30,9 @@ function calculateEconomics(games: EnrichedGame[]): AggregatedProfile["economics
   let totalValue = 0;
   let wastedValue = 0;
   let freeCount = 0;
+  let pricedGames = 0;
+  let unknownGames = 0;
+  const unpricedTail: EnrichedGame[] = [];
   let bestDeal: { name: string; pricePerHour: number } | null = null;
 
   for (const game of games) {
@@ -37,8 +40,16 @@ function calculateEconomics(games: EnrichedGame[]): AggregatedProfile["economics
       freeCount++;
       continue;
     }
-    if (game.price === undefined) continue;
+    if (game.price === undefined) {
+      // Хвост сверх потолка достраивается средней ценой: у человека с тысячей
+      // игр иначе половина библиотеки молча стоит ноль. А вот игра, о которой
+      // магазин промолчал, остаётся неизвестной — выдумывать ей цену нельзя.
+      if (game.enriched === false) unpricedTail.push(game);
+      else unknownGames++;
+      continue;
+    }
     const price = game.price;
+    pricedGames++;
     totalValue += price;
     if (game.playtime_forever === 0) {
       wastedValue += price;
@@ -53,6 +64,12 @@ function calculateEconomics(games: EnrichedGame[]): AggregatedProfile["economics
     }
   }
 
+  const avgPrice = pricedGames > 0 ? totalValue / pricedGames : 0;
+  for (const game of unpricedTail) {
+    totalValue += avgPrice;
+    if (game.playtime_forever === 0) wastedValue += avgPrice;
+  }
+
   const totalHours = games.reduce((a, g) => a + g.playtime_forever, 0) / 60;
   const perHourCost = totalHours > 0 ? Math.round((totalValue / totalHours) * 100) / 100 : 0;
   const freePercentage = games.length > 0 ? Math.round((freeCount / games.length) * 100) : 0;
@@ -63,6 +80,10 @@ function calculateEconomics(games: EnrichedGame[]): AggregatedProfile["economics
     perHourCost,
     bestDeal,
     freePercentage,
+    currency: "RUB",
+    pricedGames,
+    estimatedGames: unpricedTail.length,
+    unknownGames,
   };
 }
 

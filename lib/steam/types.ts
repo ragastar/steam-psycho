@@ -29,6 +29,10 @@ export interface EnrichedGame extends OwnedGame {
   price?: number;
   isFree?: boolean;
   averageForever?: number; // global average playtime (minutes)
+  /** Откуда взята цена: российский магазин, американский по курсу, ниоткуда. */
+  priceSource?: "ru" | "us" | "none";
+  /** false — игра из хвоста сверх потолка: цены не спрашивали вовсе. */
+  enriched?: boolean;
 }
 
 export interface PlayerAchievement {
