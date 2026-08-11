@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 
 interface Props {
-  /** Куда вернуться после входа — пока не используется, задел под план Б. */
+  /** Зовётся, когда вход состоялся: страница-хозяин обновляет себя сама. */
   onSignedIn?: () => void;
 }
 

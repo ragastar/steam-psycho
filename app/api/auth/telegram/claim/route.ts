@@ -4,13 +4,21 @@ import { CACHE_TTL, loginAttemptKey, loginCodeKey } from "@/lib/cache/keys";
 import { getClientIp } from "@/lib/http/client-ip";
 import { loginOrCreate } from "@/lib/identity/store";
 import { issueSessionCookie, readSessionFromRequest } from "@/lib/identity/session";
+import { LOGIN_CODE_ALPHABET, LOGIN_CODE_LENGTH } from "@/lib/telegram/handlers";
 
 interface LoginCode {
   telegramUserId: number;
 }
 
-/** Попыток ввода кода с одного адреса в час. */
-const MAX_ATTEMPTS = 10;
+/** НЕУДАЧНЫХ попыток ввода кода с одного адреса в час. */
+const MAX_FAILED_ATTEMPTS = 10;
+
+/**
+ * Форма кода берётся оттуда же, где коды делают: разъедься проверка с
+ * генерацией — и вход закроется для всех. В алфавите только буквы и цифры,
+ * особых знаков регулярки там нет.
+ */
+const CODE_SHAPE = new RegExp(`^[${LOGIN_CODE_ALPHABET}]{${LOGIN_CODE_LENGTH}}$`);
 
 export async function POST(req: Request) {
   let code: unknown;
@@ -23,11 +31,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "code required" }, { status: 400 });
   }
 
-  // Потолок попыток — ДО обращения к кешу. Код короткий и вводится руками,
-  // поэтому его можно перебирать машиной; без счётчика единственной защитой
-  // остаётся длина, а её человеку не увеличишь.
-  const attempts = await incrementRateLimit(loginAttemptKey(getClientIp(req)), CACHE_TTL.rateLimit);
-  if (attempts > MAX_ATTEMPTS) {
+  // Потолок — ДО обращения к кешу. Код короткий и вводится руками, поэтому его
+  // можно перебирать машиной; без счётчика единственной защитой остаётся длина,
+  // а её человеку не увеличишь. Считаем только НЕУДАЧИ и только их же и
+  // прибавляем ниже: успешный вход корзину тратить не должен, иначе за общим
+  // NAT (офис, мобильный оператор) одиннадцатый вошедший за час получает отказ,
+  // ничего не сделав. Здесь же лишь читаем счётчик — сам отказ по потолку
+  // корзину не трогает, иначе стучащийся продлевал бы себе блокировку.
+  const attemptsKey = loginAttemptKey(getClientIp(req));
+  const failed = (await getCache<number>(attemptsKey)) ?? 0;
+  if (failed >= MAX_FAILED_ATTEMPTS) {
     return NextResponse.json({ error: "too many" }, { status: 429 });
   }
 
@@ -35,8 +48,15 @@ export async function POST(req: Request) {
   // не должны решать, войдёт человек или нет.
   const normalized = code.trim().toUpperCase();
 
+  // Строка не той формы кодом быть не может — заворачиваем её, не тратя ни
+  // обращения к кешу, ни места в корзине попыток.
+  if (!CODE_SHAPE.test(normalized)) {
+    return NextResponse.json({ error: "code invalid" }, { status: 400 });
+  }
+
   const data = await getCache<LoginCode>(loginCodeKey(normalized));
   if (!data || !data.telegramUserId) {
+    await incrementRateLimit(attemptsKey, CACHE_TTL.rateLimit);
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

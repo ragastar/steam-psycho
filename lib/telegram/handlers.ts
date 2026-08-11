@@ -117,9 +117,15 @@ export function registerHandlers() {
   });
 }
 
-/** Знаки, которые нельзя спутать при чтении с экрана: без I, O, 0 и 1. */
-const LOGIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const LOGIN_CODE_LENGTH = 8;
+/**
+ * Знаки, которые нельзя спутать при чтении с экрана: без I, O, 0 и 1.
+ *
+ * Наружу торчат затем, что маршрут приёма проверяет по ним форму присланной
+ * строки. Пусть форма кода описана в одном месте — там, где коды делают, —
+ * иначе проверка с генерацией однажды разъедутся и запрут вход для всех.
+ */
+export const LOGIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const LOGIN_CODE_LENGTH = 8;
 const LOGIN_CODE_TTL = 600;
 
 /**

@@ -28,6 +28,8 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.IDENTITY_DB_PATH;
   delete process.env.ACCESS_SECRET;
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.resetModules();
 });
 
@@ -80,9 +82,13 @@ describe("сайт принимает код входа", () => {
     const { claim, handlers } = await freshModules(dbPath);
     const code = await handlers.issueLoginCode(4242);
 
-    await claim.POST(request({ code }, { ip: "10.0.0.2" }));
+    const first = await claim.POST(request({ code }, { ip: "10.0.0.2" }));
     const second = await claim.POST(request({ code }, { ip: "10.0.0.2" }));
 
+    // Первый обмен обязан УДАТЬСЯ: без этой проверки тест прошёл бы и на
+    // наглухо сломанном входе, где отказ получают оба.
+    expect(first.status).toBe(200);
+    expect(first.headers.get("set-cookie")).toContain("gt_session=");
     expect(second.status).toBe(403);
   });
 
@@ -106,7 +112,7 @@ describe("сайт принимает код входа", () => {
     expect(res.headers.get("set-cookie")).toContain("gt_session=");
   });
 
-  it("больше десяти попыток с одного адреса за час упираются в ограничитель", async () => {
+  it("больше десяти неудачных попыток с одного адреса за час упираются в ограничитель", async () => {
     // Кодов из 8 знаков много, но без потолка их перебирают машиной.
     const { claim } = await freshModules(dbPath);
 
@@ -118,6 +124,75 @@ describe("сайт принимает код входа", () => {
     const res = await claim.POST(request({ code: "ZZZZZZZZ" }, { ip: "10.0.0.5" }));
 
     expect(res.status).toBe(429);
+  });
+
+  it("успешные входы корзину попыток не тратят", async () => {
+    // За общим NAT (офис, мобильный оператор) с одного адреса входит много
+    // людей. Тот, кто ввёл код правильно, ни в чём не виноват — считать его
+    // вход попыткой значит запирать целый офис после десятого вошедшего.
+    const { claim, handlers } = await freshModules(dbPath);
+
+    for (let i = 0; i < 12; i++) {
+      const code = await handlers.issueLoginCode(5000 + i);
+      const res = await claim.POST(request({ code }, { ip: "10.0.0.6" }));
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it("строка не той формы заворачивается, не тратя корзину попыток", async () => {
+    const { claim } = await freshModules(dbPath);
+
+    // Ни длина, ни алфавит не сходятся — кодом это быть не может.
+    for (const junk of ["КОРОТКО", "0123456789ABCDEF", "ZZZZZZZ", "I1O0ABCD"]) {
+      const res = await claim.POST(request({ code: junk }, { ip: "10.0.0.10" }));
+      expect(res.status).toBe(400);
+    }
+
+    // Четыре захода мусором корзину не тронули: настоящая попытка ещё жива.
+    const real = await claim.POST(request({ code: "ZZZZZZZZ" }, { ip: "10.0.0.10" }));
+    expect(real.status).toBe(403);
+  });
+
+  it("исчерпанная корзина отпускает через час, а стук в закрытую дверь его не продлевает", async () => {
+    const { claim } = await freshModules(dbPath);
+    const ip = "10.0.0.11";
+    const attempt = () => claim.POST(request({ code: "ZZZZZZZZ" }, { ip }));
+
+    // Часы подменяем ПОСЛЕ загрузки модулей: подмена только Date, чтобы
+    // динамический импорт и промисы работали по-настоящему.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const t0 = new Date("2026-08-11T10:00:00Z").getTime();
+    vi.setSystemTime(t0);
+
+    for (let i = 0; i < 10; i++) expect((await attempt()).status).toBe(403);
+    expect((await attempt()).status).toBe(429);
+
+    // Человек читает «подожди час и попробуй снова» и пробует снова. Раньше
+    // каждая такая попытка отодвигала конец окна: совет из интерфейса
+    // продлевал блокировку тому, кто ему следовал.
+    for (const minutes of [20, 40, 59]) {
+      vi.setSystemTime(t0 + minutes * 60_000);
+      expect((await attempt()).status).toBe(429);
+    }
+
+    // Час от первой неудачи истёк — ограничитель отпустил.
+    vi.setSystemTime(t0 + 3600_000 + 1000);
+    expect((await attempt()).status).toBe(403);
+  });
+
+  it("недоступная база входа не даёт", async () => {
+    // Ошибка закрывает, а не открывает: без базы неизвестно, чей это аккаунт.
+    const noDb = path.join(dbPath, "нет-такого-каталога", "identity.db");
+    const { claim, cache, keys } = await freshModules(noDb);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await cache.setCache(keys.loginCodeKey("ABCDEFGH"), { telegramUserId: 4242 }, 600);
+
+    const res = await claim.POST(request({ code: "ABCDEFGH" }, { ip: "10.0.0.12" }));
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("set-cookie")).toBeNull();
+    // Код всё равно потрачен: повторить его нельзя даже после сбоя.
+    expect(await cache.getCache(keys.loginCodeKey("ABCDEFGH"))).toBeNull();
   });
 
   it("привязка, занятая другим аккаунтом, даёт 409 и сессию не меняет", async () => {

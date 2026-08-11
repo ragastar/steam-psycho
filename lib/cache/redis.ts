@@ -253,8 +253,21 @@ export async function incrementRateLimit(key: string, ttlSeconds: number): Promi
   }
 
   // Memory fallback for rate limiting
-  const existing = memGet<number>(key);
-  const newCount = (existing || 0) + 1;
-  memSet(key, newCount, ttlSeconds);
-  return newCount;
+  //
+  // Окно фиксированное: срок ставится при ПЕРВОМ инкременте и дальше не
+  // двигается — так же, как в ветке Redis выше (expire только при count === 1).
+  // Раньше здесь на каждый инкремент шёл memSet, и каждая новая попытка
+  // отодвигала конец окна на час вперёд: исчерпанная корзина не опустошалась,
+  // пока в неё стучится хоть кто-то чаще раза в час. Человек, следовавший
+  // совету «подожди и попробуй снова», продлевал собственную блокировку.
+  // Upstash не настроен, значит в проде работает именно эта ветка.
+  const entry = memoryCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) {
+    memSet(key, 1, ttlSeconds);
+    return 1;
+  }
+  // Значение правим на месте: expiresAt при этом остаётся прежним.
+  const next = (typeof entry.value === "number" ? entry.value : 0) + 1;
+  entry.value = next;
+  return next;
 }
