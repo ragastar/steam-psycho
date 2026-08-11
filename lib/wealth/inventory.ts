@@ -98,14 +98,17 @@ export async function fetchAppInventory(
 
     const name = description.market_hash_name;
     const marketable = description.marketable === 1;
-    const row = rows.get(name) ?? {
+    // Группируем по паре (имя, выставляемость): один и тот же item name может иметь
+    // разные экземпляры с разной выставляемостью, нужно разделить их на разные строки.
+    const rowKey = `${name}__${marketable}`;
+    const row = rows.get(rowKey) ?? {
       name,
       qty: 0,
       marketable,
       priceEur: marketable ? prices[name] : undefined,
     };
     row.qty += qty;
-    rows.set(name, row);
+    rows.set(rowKey, row);
   }
 
   const items = [...rows.values()];
