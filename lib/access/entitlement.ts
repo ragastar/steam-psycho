@@ -1,87 +1,83 @@
-import crypto from "crypto";
-import { cookies } from "next/headers";
+import { hasEntitlement } from "@/lib/billing/store";
+import { getCurrentAccountId } from "@/lib/identity/session";
 
 /**
  * Единственное место, где решается, что человеку можно показывать.
  *
- * Раньше это решал браузер: сервер отдавал всё, а компонент размывал лишнее.
- * Теперь наоборот — сервер выдаёт подписанную куку, и только она открывает
- * полный результат. Сегодня куку выдаёт подписка на Telegram-канал, завтра
- * её будет выдавать оплата: менять придётся только грант, а не проверки.
+ * Раньше правду держала подписанная кука `gt_access_*`: сервер выдавал её за
+ * подписку на Telegram-канал, и только она открывала полный разбор. Кука
+ * привязана к браузеру — а значит покупку нельзя было бы восстановить ни на
+ * другом устройстве, ни после чистки истории. Теперь правда живёт на сервере:
+ * аккаунт (кука сессии отвечает только на вопрос «кто вошёл») плюс запись
+ * права в базе.
+ *
+ * Гейт на подписку канала как способ открыть разбор отменён решением
+ * владельца 2026-08-10: второй бесплатный путь означал бы, что платить
+ * незачем. Канал остаётся, но доступа не даёт.
  */
 
 export type AccessLevel = "free" | "full";
+export type PaywallMode = "off" | "stub" | "live";
 
-const COOKIE_PREFIX = "gt_access_";
-const MAX_AGE = 30 * 24 * 3600; // 30 дней
-
-function getSecret(): string {
-  const secret = process.env.ACCESS_SECRET;
-  if (!secret || secret.length < 16) {
-    throw new Error("ACCESS_SECRET не задан или слишком короткий (нужно ≥16 символов)");
-  }
-  return secret;
+/**
+ * Один переключатель на три положения вместо россыпи флагов. До него доступ
+ * регулировали `DISABLE_GATE` и `NEXT_PUBLIC_DISABLE_GATE` — они успели
+ * противоречить друг другу, а второй к тому же читался браузером и вшивался
+ * в бандл на этапе сборки.
+ *
+ * - `off`  — всё бесплатно, кассы нет. Значение по умолчанию.
+ * - `stub` — полный цикл на поддельной кассе.
+ * - `live` — боевой эквайер.
+ *
+ * Неизвестное значение — это `off`. Опечатка в переменной окружения не должна
+ * ни включать кассу, ни закрывать сайт: ошибка обязана оставлять всё как есть,
+ * а «как есть» сегодня — открыто.
+ *
+ * Читается на каждом вызове, а не при загрузке модуля, — иначе режим замерзал
+ * бы на том, каким он был в момент первого импорта.
+ */
+export function paywallMode(): PaywallMode {
+  const mode = process.env.PAYWALL_MODE;
+  if (mode === "stub") return "stub";
+  if (mode === "live") return "live";
+  if (mode) warnUnknownMode(mode);
+  return "off";
 }
 
-function cookieName(steamId64: string): string {
-  return `${COOKIE_PREFIX}${steamId64}`;
-}
+/**
+ * Непонятое значение молчать не должно. Само по себе оно безопасно — сайт
+ * остаётся таким, каким был вчера, — но выглядит это как «касса включена, а
+ * денег нет»: `PAYWALL_MODE="live"` с кавычками из docker-compose или лишний
+ * пробел в конце строки отключают оплату целиком и никак себя не проявляют.
+ *
+ * Жалуемся один раз на каждое непонятое значение: проверка режима случается
+ * на каждый показ страницы, и без этого лог утонул бы в повторах.
+ */
+const warnedModes = new Set<string>();
 
-/** Подпись привязана к конкретному профилю и сроку — куку нельзя переклеить. */
-function sign(steamId64: string, expiresAt: number): string {
-  return crypto
-    .createHmac("sha256", getSecret())
-    .update(`${steamId64}:${expiresAt}`)
-    .digest("hex");
-}
-
-export function issueAccessCookie(steamId64: string): {
-  name: string;
-  value: string;
-  options: Record<string, unknown>;
-} {
-  const expiresAt = Math.floor(Date.now() / 1000) + MAX_AGE;
-  return {
-    name: cookieName(steamId64),
-    value: `${expiresAt}.${sign(steamId64, expiresAt)}`,
-    options: {
-      httpOnly: true,
-      // По HTTP браузер молча отбрасывает куку с Secure, поэтому для зеркала
-      // на голом IP нужен явный тумблер. Включать только там, где нет TLS.
-      secure: process.env.NODE_ENV === "production" && process.env.ALLOW_INSECURE_COOKIES !== "true",
-      sameSite: "lax",
-      path: "/",
-      maxAge: MAX_AGE,
-    },
-  };
-}
-
-export function verifyAccessValue(steamId64: string, value: string | undefined): boolean {
-  if (!value) return false;
-  const [rawExp, providedSig] = value.split(".");
-  if (!rawExp || !providedSig) return false;
-
-  const expiresAt = Number(rawExp);
-  if (!Number.isFinite(expiresAt) || expiresAt < Date.now() / 1000) return false;
-
-  const expected = sign(steamId64, expiresAt);
-  // Длины совпадают всегда (hex sha256), но timingSafeEqual падает при разных —
-  // поэтому проверяем перед сравнением.
-  if (expected.length !== providedSig.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(providedSig));
+function warnUnknownMode(mode: string): void {
+  if (warnedModes.has(mode)) return;
+  warnedModes.add(mode);
+  console.error(
+    `[billing] PAYWALL_MODE=${JSON.stringify(mode)} не распознан — считаю выключенным (off). Допустимо: off, stub, live`,
+  );
 }
 
 export async function getAccessLevel(steamId64: string): Promise<AccessLevel> {
-  // Серверный тумблер для отладки. Раньше это был NEXT_PUBLIC_DISABLE_GATE —
-  // то есть флаг, который видел и мог подставить сам браузер.
-  if (process.env.DISABLE_GATE === "true") return "full";
+  // Проверка режима стоит ДО try: при выключенной кассе доступ открыт
+  // безусловно, и никакая беда ниже не должна превращать сегодняшний
+  // бесплатный сайт в закрытый.
+  if (paywallMode() === "off") return "full";
 
   try {
-    const store = await cookies();
-    const raw = store.get(cookieName(steamId64))?.value;
-    return verifyAccessValue(steamId64, raw) ? "full" : "free";
+    const accountId = await getCurrentAccountId();
+    // Не вошёл — права быть не может: право принадлежит аккаунту, а не браузеру.
+    if (!accountId) return "free";
+    return hasEntitlement(accountId, steamId64) ? "full" : "free";
   } catch {
-    // Нет доступа к кукам или не задан секрет — закрываем, а не открываем.
+    // Любая осечка закрывает, а не открывает. В этом проекте уже были две дыры
+    // обратной формы: catch, возвращавший "unlocked", и проверка секрета вида
+    // «если секрет задан».
     return "free";
   }
 }

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { TelegramGate } from "./TelegramGate";
 import type { TeaserProfile } from "@/lib/access/redact";
 import type { Rarity } from "@/lib/llm/types";
 
@@ -84,10 +83,6 @@ export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted =
       startedRef.current = false;
     }
   }, [steamId64, locale, router]);
-
-  const handleUnlock = useCallback(() => {
-    triggerGeneration();
-  }, [triggerGeneration]);
 
   // Доступ уже разрешён сервером, а карточки ещё нет — запускаем генерацию
   // сами, иначе посетитель навсегда застревает на витрине: раньше генерацию
@@ -258,19 +253,12 @@ export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted =
           </div>
         </motion.div>
 
-        {/* Telegram CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <TelegramGate
-            steamId64={steamId64}
-            locale={locale}
-            onUnlock={handleUnlock}
-            accessGranted={accessGranted}
-          />
-        </motion.div>
+        {/*
+          Здесь стоял замок «подпишись на Telegram-канал». Гейт на подписку
+          отменён как способ открыть разбор (решение владельца 2026-08-10):
+          второй бесплатный путь означал бы, что платить незачем. Кнопку
+          покупки на это место ставит следующая задача плана.
+        */}
       </div>
     </div>
   );
