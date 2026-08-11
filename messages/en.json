@@ -59,6 +59,7 @@
   },
   "result": {
     "yourProfile": "Your profile",
+    "statsExplain": "How the stats are read",
     "vibeQuote": "Quote",
     "spiritGame": "Spirit Game",
     "spiritAnimal": "Spirit Animal",
@@ -359,7 +360,7 @@
     "subtitle": "You've seen the verdict. Everything else is waiting behind the button — and it's a lot more than a couple of lines.",
     "whatYouGet": "What you unlock:",
     "includes": {
-      "roasts": "Five more roasts — one for every sore spot",
+      "roasts": "{count, plural, one {# more roast} other {# more roasts}} — one for every sore spot",
       "psycho": "Big Five psycho profile and six motivation scales",
       "shadow": "Two shadow archetypes — the parts you don't admit to",
       "spirit": "Your spirit animal, described, plus your totem game",
@@ -374,6 +375,6 @@
     "loginHint": "Sign in so the purchase sticks. It's tied to your account, not to this browser.",
     "alreadyOwned": "You already own this read — refreshing the page.",
     "failed": "Couldn't start the payment. Give it another go.",
-    "unavailable": "Payments are switched off right now — nothing to buy here."
+    "unavailable": "Payments aren't hooked up yet — there's nothing to buy right now."
   }
 }

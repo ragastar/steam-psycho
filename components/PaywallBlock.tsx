@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { priceInRubles } from "@/lib/billing/price";
@@ -9,6 +9,12 @@ import { LoginPanel } from "./LoginPanel";
 interface PaywallBlockProps {
   steamId64: string;
   locale: string;
+  /**
+   * Сколько роастов закрыто. Схема допускает 5–6 роастов на карточку, один из
+   * них уходит в бесплатную часть — значит закрытых бывает и четыре. Продающая
+   * строка обязана называть настоящее число: это обещание товара, а не украшение.
+   */
+  lockedCount: number;
 }
 
 /** Отказы кассы, у каждого свой текст: «попробуй ещё раз» на выключенной кассе — вредный совет. */
@@ -28,12 +34,26 @@ const INCLUDES = [
   { icon: "📊", key: "analytics" },
 ] as const;
 
-export function PaywallBlock({ steamId64, locale }: PaywallBlockProps) {
+export function PaywallBlock({ steamId64, locale, lockedCount }: PaywallBlockProps) {
   const t = useTranslations();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
   const [refusal, setRefusal] = useState<Refusal>("");
+
+  useEffect(() => {
+    // Возврат «Назад» с кассы. Уход на payUrl кнопку намеренно не
+    // разблокировал — страница уже уходила. Но Safari (в том числе мобильная) и
+    // Firefox восстанавливают страницу из кеша навигации ВМЕСТЕ с состоянием, и
+    // единственная кнопка покупки осталась бы заблокированной с надписью
+    // «Открываем кассу…» навсегда: перезагрузки «Назад» не делает. У заглушки
+    // касса — свой же адрес, так что путь этот самый обычный, а не редкий.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setPending(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   const buy = useCallback(async () => {
     // Кнопка на время запроса и так заблокирована; эта проверка страхует
@@ -58,8 +78,12 @@ export function PaywallBlock({ steamId64, locale }: PaywallBlockProps) {
       return;
     }
 
+    // Тело разбираем один раз на все исходы: в удачном лежит адрес кассы, в
+    // отказном — `code`, по которому выбирается текст. Пустое или битое тело
+    // читается как отказ без подробностей, а не роняет обработчик.
+    const data: { payUrl?: unknown; code?: unknown } = await res.json().catch(() => ({}));
+
     if (res.ok) {
-      const data = await res.json().catch(() => ({}));
       if (typeof data.payUrl === "string" && data.payUrl) {
         // Уход на кассу — не клиентский переход: адрес по смыслу внешний, а при
         // `live` он и будет чужим доменом. Кнопку намеренно не разблокируем:
@@ -76,12 +100,11 @@ export function PaywallBlock({ steamId64, locale }: PaywallBlockProps) {
       // Разбор уже куплен — на сервере он открыт, а страница показывает старое.
       setRefusal("alreadyOwned");
       router.refresh();
-    } else if (res.status === 404) {
-      // Касса выключена. В этом режиме кнопки быть не должно вовсе, но молчать
-      // на нажатие всё равно нельзя.
-      setRefusal("unavailable");
     } else {
-      setRefusal("failed");
+      // Отказ на срок решает не статус, а `code`: «касса не подключена» держится
+      // до вмешательства владельца, и совет «попробуй ещё раз» на него — обещание,
+      // которое не сбудется ни разу. Честное «пока нельзя» полезнее.
+      setRefusal(data.code === "no_provider" ? "unavailable" : "failed");
     }
 
     setPending(false);
@@ -101,12 +124,19 @@ export function PaywallBlock({ steamId64, locale }: PaywallBlockProps) {
           {t("paywall.whatYouGet")}
         </p>
         <ul className="space-y-2">
-          {INCLUDES.map((item) => (
+          {/* Строку про роасты убираем, когда закрытых нет вовсе: старая карточка
+              из кеша может нести один-единственный роаст, и «ещё 0 роастов» — то
+              же враньё, что и «ещё пять», только наоборот. */}
+          {INCLUDES.filter((item) => item.key !== "roasts" || lockedCount > 0).map((item) => (
             <li key={item.key} className="flex items-start gap-3 bg-gray-800/50 rounded-lg px-3 py-2.5">
               <span className="text-lg flex-shrink-0" aria-hidden="true">
                 {item.icon}
               </span>
-              <span className="text-sm text-gray-200">{t(`paywall.includes.${item.key}`)}</span>
+              {/* Число подставляется во все строки списка разом: лишние значения
+                  перевод молча игнорирует, а роастам оно нужно настоящее. */}
+              <span className="text-sm text-gray-200">
+                {t(`paywall.includes.${item.key}`, { count: lockedCount })}
+              </span>
             </li>
           ))}
         </ul>
@@ -140,7 +170,11 @@ export function PaywallBlock({ steamId64, locale }: PaywallBlockProps) {
           <p className="text-sm text-gray-300 text-center">{t("paywall.loginHint")}</p>
           {/* Вход состоялся — сразу повторяем покупку: человек нажимал «купить»,
               а не «войти», и второе нажатие ему возвращать незачем. */}
+          {/* backSteamId — чтобы вход через Steam вернул человека СЮДА. Он
+              уводит браузер целиком, и без этого возврат приходился на лендинг:
+              вошёл, но выброшен с разбора, который собирался купить. */}
           <LoginPanel
+            backSteamId={steamId64}
             onSignedIn={() => {
               setNeedLogin(false);
               buy();

@@ -15,11 +15,18 @@ import path from "path";
  * модуля сессии скрыла бы ровно ту ошибку, ради которой этот тест написан, —
  * «маршрут пускает без входа».
  */
-async function freshWorld(opts: { dbPath: string; mode?: string; secret?: string }) {
+async function freshWorld(opts: {
+  dbPath: string;
+  mode?: string;
+  secret?: string;
+  /** Потолок попыток начать покупку. По умолчанию заведомо недостижимый. */
+  rateLimit?: string;
+}) {
   process.env.IDENTITY_DB_PATH = opts.dbPath;
   process.env.ACCESS_SECRET = ACCESS_SECRET;
   setEnv("PAYWALL_MODE", opts.mode);
   setEnv("PAYMENT_WEBHOOK_SECRET", opts.secret ?? SECRET);
+  setEnv("PAY_RATE_LIMIT_PER_HOUR", opts.rateLimit ?? "1000");
 
   vi.resetModules();
   const identity = await import("@/lib/identity/store");
@@ -47,10 +54,16 @@ const OTHER_STEAM_ID = "76561197990915488";
 
 let dbPath: string;
 let nextTelegramId = 1;
+let clientIp: string;
+let nextIp = 1;
 
 beforeEach(() => {
   dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pay-create-")), "billing.db");
   nextTelegramId = 1;
+  // Корзина лимита живёт в кеше, а кеш — на globalThis и переживает
+  // vi.resetModules(). Каждому тесту свой адрес, иначе они тратят одну корзину
+  // на всех и падают по очереди в зависимости от порядка.
+  clientIp = `10.0.0.${nextIp++}`;
 });
 
 afterEach(() => {
@@ -58,6 +71,7 @@ afterEach(() => {
   delete process.env.ACCESS_SECRET;
   delete process.env.PAYWALL_MODE;
   delete process.env.PAYMENT_WEBHOOK_SECRET;
+  delete process.env.PAY_RATE_LIMIT_PER_HOUR;
   vi.resetModules();
 });
 
@@ -76,7 +90,11 @@ function cookieFor(session: World["session"], accountId: number): string {
 }
 
 function createRequest(body: unknown, cookie?: string): Request {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    // Адрес клиента берётся из последнего элемента X-Forwarded-For (lib/http/client-ip).
+    "x-forwarded-for": clientIp,
+  };
   if (cookie) headers["cookie"] = cookie;
   return new Request("https://example.test/api/pay/create", {
     method: "POST",
@@ -242,6 +260,61 @@ describe("двойное нажатие не рождает второй зак�
   });
 });
 
+describe("чужой заказ не достаётся сегодняшней кассе", () => {
+  it("открытый заказ другого приёмщика не переиспользуется", async () => {
+    const { identity, billing, session, price, route } = await freshWorld({ dbPath, mode: "stub" });
+    const accountId = makeAccount(identity);
+    // Ключ идемпотентности берём ровно тот, что сложит маршрут (аккаунт, разбор
+    // и цена совпадают): так проверяется и обход по солёному ключу, а не только
+    // первая ветка.
+    const foreign = billing.createOrder({
+      accountId,
+      steamId64: STEAM_ID,
+      amountKop: price.PRICE_KOP,
+      provider: "yookassa",
+      idempotencyKey: `pay:v1:${accountId}:${STEAM_ID}:${price.PRICE_KOP}`,
+    })!;
+
+    const res = await route.POST(
+      createRequest({ steamId64: STEAM_ID, locale: "ru" }, cookieFor(session, accountId)),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    // Иначе владелец переключил бы live, вернувшийся посетитель заплатил бы
+    // настоящими деньгами по заказу с provider = 'stub', и в отчётах эта оплата
+    // лежала бы тестовой — при сверке с банком это расхождение.
+    expect(body.payUrl).not.toBe(`/ru/pay/${foreign.id}`);
+    expect(countOrders()).toBe(2);
+
+    const usedId = Number(String(body.payUrl).split("/").pop());
+    expect(billing.findOrder(usedId)!.provider).toBe("stub");
+    // Чужой заказ не тронут: закрывать его не наше дело.
+    expect(billing.findOrder(foreign.id)!.status).toBe("created");
+  });
+});
+
+describe("частые попытки начать покупку упираются в потолок", () => {
+  it("сверх потолка — 429, и лишних заказов не появляется", async () => {
+    const { identity, session, route } = await freshWorld({ dbPath, mode: "stub", rateLimit: "2" });
+    const cookie = cookieFor(session, makeAccount(identity));
+
+    // Номера разные намеренно: существование профиля здесь не проверяется, и
+    // каждая попытка с новым номером пишет НОВУЮ строку в базу заказов — в тот
+    // же файл, где лежат аккаунты и права.
+    const first = await route.POST(createRequest({ steamId64: STEAM_ID, locale: "ru" }, cookie));
+    const second = await route.POST(createRequest({ steamId64: OTHER_STEAM_ID, locale: "ru" }, cookie));
+    const third = await route.POST(
+      createRequest({ steamId64: "76561197990915487", locale: "ru" }, cookie),
+    );
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(third.status).toBe(429);
+    expect(countOrders()).toBe(2);
+  });
+});
+
 describe("что приходит в теле запроса, тому верить нельзя", () => {
   it("мусорный steamId64 — 400, заказа нет", async () => {
     const { identity, session, route } = await freshWorld({ dbPath, mode: "stub" });
@@ -312,6 +385,9 @@ describe("беда на нашей стороне не открывает дос
     );
 
     expect(res.status).toBe(503);
+    // Отказ постоянный, и витрина обязана уметь отличить его от «попробуйте
+    // ещё раз»: приёмщика при live нет ВСЕГДА, пока владелец не подключит кассу.
+    expect((await res.json()).code).toBe("no_provider");
     expect(countOrders()).toBe(0);
   });
 });

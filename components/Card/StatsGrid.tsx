@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 
 interface StatItem {
@@ -17,22 +18,34 @@ interface StatsGridProps {
 }
 
 export function StatsGrid({ stats, barClass, gradientClass }: StatsGridProps) {
+  const t = useTranslations();
   const [showExplanations, setShowExplanations] = useState(false);
+
+  // Пояснения считаются по полному профилю, поэтому в бесплатном виде их нет ни
+  // у одной шкалы. Кнопка там меняла вид и не показывала ничего — обещание,
+  // которого не сдержать. Полный вид не страдает: там пояснения есть.
+  const hasExplanations = stats.some((stat) => stat.explanation);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-xs text-gray-500 uppercase tracking-wider">Stats</h3>
-        <button
-          onClick={() => setShowExplanations(!showExplanations)}
-          className={`w-5 h-5 rounded-full text-xs font-bold transition-all ${
-            showExplanations
-              ? "bg-purple-500 text-white shadow-lg shadow-purple-500/30"
-              : "bg-gray-700 text-gray-300 hover:bg-purple-500/50 hover:text-white"
-          }`}
-        >
-          {showExplanations ? "×" : "?"}
-        </button>
+        {hasExplanations && (
+          <button
+            onClick={() => setShowExplanations(!showExplanations)}
+            // Знак «?» скринридер объявлял как «знак вопроса, кнопка» — из этого
+            // не понять ни что она делает, ни включена ли она сейчас.
+            aria-label={t("result.statsExplain")}
+            aria-expanded={showExplanations}
+            className={`w-5 h-5 rounded-full text-xs font-bold transition-all ${
+              showExplanations
+                ? "bg-purple-500 text-white shadow-lg shadow-purple-500/30"
+                : "bg-gray-700 text-gray-300 hover:bg-purple-500/50 hover:text-white"
+            }`}
+          >
+            {showExplanations ? "×" : "?"}
+          </button>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
         {stats.map((stat, i) => (

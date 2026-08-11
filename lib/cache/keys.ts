@@ -43,6 +43,17 @@ export function loginAttemptKey(ip: string): string {
   return `ratelimit:logincode:${ip}`;
 }
 
+/**
+ * Попытки начать покупку с одного адреса. Ключ отдельный от rateLimitKey
+ * намеренно: там корзина про расход на модель (разбор библиотеки), а здесь про
+ * мусор в базе заказов — каждая попытка пишет строку в тот же файл SQLite, где
+ * лежат аккаунты и права. Потолки у них разные, и общая корзина означала бы,
+ * что один расход съедает чужой.
+ */
+export function payCreateKey(ip: string): string {
+  return `ratelimit:paycreate:${ip}`;
+}
+
 export function cardStatsKey(steamId64: string): string {
   return `cardstats:v1:${steamId64}`;
 }

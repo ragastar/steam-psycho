@@ -18,9 +18,17 @@ describe("урезание профиля до открытия доступа (
   const serialized = JSON.stringify(teaser);
 
   it("оставляет только витрину: имя, аватар, уровень, игры, часы", () => {
-    expect(Object.keys(teaser)).toEqual(["player", "stats"]);
+    expect(Object.keys(teaser).sort()).toEqual(["__teaser", "player", "stats"]);
     expect(Object.keys(teaser.player).sort()).toEqual(["avatar", "name", "steamLevel"]);
     expect(Object.keys(teaser.stats).sort()).toEqual(["totalGames", "totalPlaytimeHours"]);
+  });
+
+  it("проставляет метку урезанного профиля", () => {
+    // Сама непроходимость типов тестом не выражается: полный профиль перестаёт
+    // подходить под TeaserProfile на СБОРКЕ. Но замок держится на этом поле, и
+    // если его снесут как мусор, компилятор снова пропустит `profile={profile}`
+    // мимо `toTeaserProfile` — а вместе с ним и весь платный профиль в браузер.
+    expect(teaser.__teaser).toBe(true);
   });
 
   it("не пропускает наружу закрытые разделы", () => {

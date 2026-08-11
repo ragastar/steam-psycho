@@ -41,10 +41,13 @@ function callbackRequest(opts: {
   /** Сырой заголовок Cookie — для проверки границ имени куки. */
   rawCookie?: string;
   locale?: string;
+  /** Разбор, с которого ушли входить, — едет тем же подписанным адресом. */
+  back?: string;
 }): Request {
   const query = new URLSearchParams();
   if (opts.returnToState !== undefined) query.set("state", opts.returnToState);
   if (opts.locale !== undefined) query.set("locale", opts.locale);
+  if (opts.back !== undefined) query.set("back", opts.back);
   const returnTo =
     query.size === 0
       ? "https://zadrotometr.ru/api/auth/steam/callback"
@@ -140,6 +143,52 @@ describe("защита возврата из Steam от Login CSRF", () => {
 
     expect(res.headers.get("location")).toContain("login=failed");
     expect(res.cookies.get("gt_session")).toBeUndefined();
+  });
+});
+
+describe("покупатель возвращается на свой разбор, а не на лендинг", () => {
+  it("номер разбора из подписанного адреса уводит на этот разбор", async () => {
+    stubValidFetch();
+    const { GET } = await freshCallback(dbPath);
+
+    const res = await GET(
+      callbackRequest({ returnToState: "secret123", cookieState: "secret123", back: "76561197990915489" }),
+    );
+
+    // Человек нажимал «купить», а не «войти»: лендинг после входа означает
+    // потерянную покупку — а это самый дорогой шаг воронки.
+    expect(res.headers.get("location")).toBe(
+      "https://zadrotometr.ru/ru/result/76561197990915489?login=ok",
+    );
+  });
+
+  it("отказ возвращает туда же — на разбор, а не на главную", async () => {
+    stubValidFetch();
+    const { GET } = await freshCallback(dbPath);
+
+    const res = await GET(
+      callbackRequest({ returnToState: "чужая метка", cookieState: "secret123", back: "76561197990915489" }),
+    );
+
+    expect(res.headers.get("location")).toBe(
+      "https://zadrotometr.ru/ru/result/76561197990915489?login=failed",
+    );
+    expect(res.cookies.get("gt_session")).toBeUndefined();
+  });
+
+  it("мусор в поле возврата не уезжает в редирект", async () => {
+    stubValidFetch();
+
+    // Подписанный адрес приходит от Steam, но подпись сверяется ПОСЛЕ, а путь
+    // складывается уже здесь: пускать в него что попало нельзя.
+    for (const back of ["//evil.example", "https://evil.example/x", "76561197990915489a", "1"]) {
+      const { GET } = await freshCallback(dbPath);
+      const res = await GET(
+        callbackRequest({ returnToState: "secret123", cookieState: "secret123", back }),
+      );
+
+      expect(res.headers.get("location")).toBe("https://zadrotometr.ru/ru?login=ok");
+    }
   });
 });
 

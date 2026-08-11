@@ -180,7 +180,7 @@ export function FreeResult({ free, profile, steamId64, locale, isOwner = false }
         {/* Витрина покупки стоит ПЕРЕД размытым, а не поверх него: оверлей на
             320px обрезал бы либо цену, либо дисклеймер, а читаемость здесь
             важнее приёма. */}
-        <PaywallBlock steamId64={steamId64} locale={locale} />
+        <PaywallBlock steamId64={steamId64} locale={locale} lockedCount={free.lockedRoasts.length} />
 
         <div className="space-y-2">
           <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold text-center">

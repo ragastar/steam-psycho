@@ -44,6 +44,32 @@ describe("начало входа через Steam", () => {
   });
 });
 
+describe("возврат на разбор, с которого ушли входить", () => {
+  it("семнадцать цифр доезжают до подписанного адреса возврата", async () => {
+    const res = await GET(startRequest({}, "?back=76561197990915489"));
+
+    expect(returnToOf(res).searchParams.get("back")).toBe("76561197990915489");
+  });
+
+  it("что угодно другое молча выбрасывается", async () => {
+    // Провозится НЕ путь, а номер разбора: адрес возврата сервер склеивает сам,
+    // поэтому увести человека на чужой сайт этим полем нечем в принципе.
+    const junk = [
+      "буквы",
+      "123",
+      "765611979909154891",
+      "76561197990915489a",
+      "http://evil.example/",
+      "/ru/result/76561197990915489",
+    ];
+
+    for (const back of junk) {
+      const res = await GET(startRequest({}, `?back=${encodeURIComponent(back)}`));
+      expect(returnToOf(res).searchParams.get("back")).toBeNull();
+    }
+  });
+});
+
 describe("выбор языка для входа", () => {
   it("явный параметр важнее всего остального", () => {
     const req = new Request("https://zadrotometr.ru/api/auth/steam/start?locale=en", {

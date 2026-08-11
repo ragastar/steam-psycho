@@ -31,6 +31,9 @@ function fromReturnTo(params: URLSearchParams, name: string): string | null {
   }
 }
 
+/** Та же форма, что на /start: обратно едет Steam ID разбора, а не путь. */
+const BACK_SHAPE = /^\d{17}$/;
+
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
 
@@ -39,7 +42,23 @@ export async function GET(req: Request) {
   // значение ещё не доказано — но выбор ограничен списком языков, так что
   // худшее, что может сделать подделка, — увести человека на свой язык.
   const locale = normalizeLocale(fromReturnTo(params, "locale")) ?? defaultLocale;
-  const home = (outcome: string) => NextResponse.redirect(`${SITE_URL}/${locale}?login=${outcome}`);
+
+  // Разбор, с которого ушли входить. Проверяем ещё раз здесь, а не полагаемся
+  // на проверку в /start: адрес возврата хоть и подписан Steam'ом, но подпись
+  // сверяется ниже, а этот адрес складывается уже сейчас. Семнадцать цифр
+  // подставляются в ПУТЬ, поэтому пускать туда что попало нельзя.
+  const rawBack = fromReturnTo(params, "back");
+  const back = rawBack && BACK_SHAPE.test(rawBack) ? rawBack : null;
+
+  // Вернуть человека надо туда, откуда он ушёл: он нажимал «купить», а не
+  // «войти», и лендинг после входа означает потерянную покупку. Без `back` —
+  // прежнее поведение, главная.
+  const home = (outcome: string) =>
+    NextResponse.redirect(
+      back
+        ? `${SITE_URL}/${locale}/result/${back}?login=${outcome}`
+        : `${SITE_URL}/${locale}?login=${outcome}`,
+    );
 
   // Защита от Login CSRF (session fixation): подписанная Steam'ом ссылка
   // возврата сама по себе ничего не доказывает про то, КТО её открыл —

@@ -6,6 +6,14 @@ import { useTranslations } from "next-intl";
 interface Props {
   /** Зовётся, когда вход состоялся: страница-хозяин обновляет себя сама. */
   onSignedIn?: () => void;
+  /**
+   * Разбор, на который вернуть после входа через Steam (17 цифр).
+   *
+   * Вход через Telegram остаётся на месте — там страница никуда не уходит.
+   * А Steam уводит браузер целиком, и без этого человека возвращало на
+   * лендинг: вошёл, но выброшен с разбора, который собирался купить.
+   */
+  backSteamId?: string;
 }
 
 const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT || "gamertype_bot";
@@ -15,7 +23,7 @@ const BOT_LOGIN_URL = `https://t.me/${BOT_USERNAME}?start=login`;
 
 type LoginError = "" | "taken" | "failed" | "codeWrong" | "tooMany";
 
-export function LoginPanel({ onSignedIn }: Props) {
+export function LoginPanel({ onSignedIn, backSteamId }: Props) {
   const t = useTranslations();
   const [accountId, setAccountId] = useState<number | null>(null);
   const [code, setCode] = useState("");
@@ -67,6 +75,13 @@ export function LoginPanel({ onSignedIn }: Props) {
     return <p className="text-sm text-green-400">{t("auth.signedIn")}</p>;
   }
 
+  // Форму проверяет и сервер — здесь она нужна лишь затем, чтобы не отправлять
+  // в адрес заведомую бессмыслицу.
+  const steamStartUrl =
+    backSteamId && /^\d{17}$/.test(backSteamId)
+      ? `/api/auth/steam/start?back=${backSteamId}`
+      : "/api/auth/steam/start";
+
   return (
     <div className="space-y-3 text-center">
       <p className="text-sm text-gray-400">{t("auth.signIn")}</p>
@@ -80,10 +95,11 @@ export function LoginPanel({ onSignedIn }: Props) {
           {t("auth.viaTelegram")}
         </a>
         {/* Это не страница, а серверный маршрут, отвечающий редиректом на Steam;
-            next/link дал бы клиентский переход и сломал бы редирект. */}
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            next/link дал бы клиентский переход и сломал бы редирект. Правило
+            no-html-link-for-pages молчит само: адрес теперь собирается в
+            переменной, а не стоит здесь строкой. */}
         <a
-          href="/api/auth/steam/start"
+          href={steamStartUrl}
           className="px-5 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold transition-colors"
         >
           {t("auth.viaSteam")}
