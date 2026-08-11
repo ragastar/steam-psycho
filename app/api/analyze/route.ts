@@ -19,6 +19,9 @@ import { CACHE_TTL, portraitKey, profileKey, rateLimitKey, cardStatsKey, rarityK
 import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
+import { getClientIp } from "@/lib/http/client-ip";
+import { getPercentileSample } from "@/lib/analytics/queries";
+import { percentileRank } from "@/lib/aggregation/percentile";
 
 const ERROR_CODES: Record<string, number> = {
   INVALID_INPUT: 400,
@@ -65,8 +68,7 @@ async function fetchAchievementsForTopGames(
 export async function POST(req: Request) {
   try {
     // Rate limiting
-    const forwarded = req.headers.get("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || "unknown";
+    const ip = getClientIp(req);
     const rateLimitCount = await incrementRateLimit(rateLimitKey(ip), CACHE_TTL.rateLimit);
     const rateLimit = parseInt(process.env.RATE_LIMIT_PER_HOUR || "30", 10);
     if (rateLimitCount > rateLimit) {
@@ -173,6 +175,19 @@ export async function POST(req: Request) {
       achievementsData,
     );
 
+    // 6.5 Заменяем прикидочные перцентили на реальные, если своей статистики
+    // уже достаточно. Иначе остаются пороги из кода, помеченные как оценка.
+    const sample = getPercentileSample();
+    if (sample) {
+      profile.ranks = {
+        hoursPercentile: percentileRank(sample.hours, profile.stats.totalPlaytimeHours),
+        librarySizePercentile: percentileRank(sample.library, profile.stats.totalGames),
+        concentrationPercentile: profile.ranks.concentrationPercentile,
+        veteranPercentile: percentileRank(sample.accountAge, profile.timeline.accountAge),
+        estimated: false,
+      };
+    }
+
     // 7. Calculate card stats and rarity
     const cardStats = calculateCardStats(profile);
     const rarity = calculateRarity(profile);
@@ -202,8 +217,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ steamId64, cached: false });
   } catch (err) {
-    const forwarded2 = req.headers.get("x-forwarded-for");
-    const errIp = forwarded2?.split(",")[0]?.trim() || "unknown";
+    const errIp = getClientIp(req);
     const errIpHash = hashIp(errIp);
 
     if (err instanceof SteamApiError) {

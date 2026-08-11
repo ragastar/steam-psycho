@@ -25,7 +25,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ status: data.status });
   } catch {
-    // Graceful degradation: if Redis is down, unlock
-    return NextResponse.json({ status: "unlocked" });
+    // Раньше здесь стояло "unlocked": любая ошибка кеша открывала доступ.
+    // Сбой не должен раздавать платное — отвечаем «ещё не открыто».
+    return NextResponse.json({ status: "pending" });
   }
 }

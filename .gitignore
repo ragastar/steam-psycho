@@ -42,3 +42,17 @@ next-env.d.ts
 # PRD docs
 /extract/
 *.docx
+
+# серверные файлы деплоя (не должны уезжать в репозиторий)
+/docker-compose.override.yml
+/enable-tls.sh
+/enable-tls.log
+
+# выгрузки промптов для ручной проверки
+/tmp/
+
+# резервные копии настроек
+/.env.local.bak-*
+
+# Рабочие файлы координации агентов (ledger, брифы, отчёты ревью)
+/.superpowers

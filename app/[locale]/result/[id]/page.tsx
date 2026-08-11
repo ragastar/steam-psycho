@@ -10,21 +10,27 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
+import { getAccessLevel } from "@/lib/access/entitlement";
+import { toTeaserProfile } from "@/lib/access/redact";
+import { getCurrentAccountId } from "@/lib/identity/session";
+import { accountOwnsSteamId } from "@/lib/identity/store";
+import { SITE_URL, SITE_NAME } from "@/lib/site";
 
 interface Props {
-  params: { id: string; locale: string };
+  // В Next 15+ параметры маршрута приходят промисом.
+  params: Promise<{ id: string; locale: string }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params: rawParams }: Props): Promise<Metadata> {
+  const params = await rawParams;
   const portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://gamertype.fun";
 
   if (!portrait || !profile) {
-    return { title: "GamerType" };
+    return { title: SITE_NAME };
   }
 
-  const title = `${profile.player.name} — "${portrait.primaryArchetype.name}" | GamerType`;
+  const title = `${profile.player.name} — "${portrait.primaryArchetype.name}" | ${SITE_NAME}`;
   const description = portrait.quote;
 
   return {
@@ -33,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      images: [`${baseUrl}/${params.locale}/result/${params.id}/opengraph-image`],
+      images: [`${SITE_URL}/${params.locale}/result/${params.id}/opengraph-image`],
       type: "website",
     },
     twitter: {
@@ -44,26 +50,71 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ResultPage({ params }: Props) {
+export default async function ResultPage({ params: rawParams }: Props) {
+  const params = await rawParams;
   const t = await getTranslations();
   let portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
   const profile = await getCache<AggregatedProfile>(profileKey(params.id));
 
-  // Teaser: profile exists but no portrait yet (pre-subscription state)
+  // Решение о доступе принимает сервер. Пока доступа нет, ни портрет, ни полный
+  // профиль в браузер не уезжают — раньше они уходили целиком и лишь размывались.
+  const access = await getAccessLevel(params.id);
+
+  // Владение доказывает ТОЛЬКО подтверждённая привязка Steam. Вход через
+  // Telegram или любая ошибка здесь означают «не владелец» — ошибка не
+  // повышает права, только понижает. Обещание держит сам слой личности:
+  // недоступная база отдаёт false (lib/identity/db.ts), а не исключение,
+  // иначе беда с базой превращалась бы в 500 на главной странице продукта.
+  const currentAccountId = await getCurrentAccountId();
+  const isOwner = currentAccountId ? accountOwnsSteamId(currentAccountId, params.id) : false;
+
+  if (access !== "full" && profile) {
+    const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
+    return (
+      <div className="min-h-screen">
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+          {isOwner && (
+            <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
+              {t("result.yourProfile")}
+            </span>
+          )}
+          <LocaleSwitcher />
+        </div>
+        <TeaserPage
+          profile={toTeaserProfile(profile)}
+          steamId64={params.id}
+          locale={params.locale}
+          rarity={cachedRarity ?? "common"}
+        />
+      </div>
+    );
+  }
+
+  // Доступ есть, но портрет ещё не сгенерирован — показываем ту же витрину,
+  // она сама запустит генерацию.
   if (!portrait && profile) {
     const cachedStats = await getCache<CardStats>(cardStatsKey(params.id));
     const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
     if (cachedStats && cachedRarity) {
       return (
         <div className="min-h-screen">
-          <div className="absolute top-4 right-4 z-30">
+          <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+            {isOwner && (
+              <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-300 text-xs font-semibold">
+                {t("result.yourProfile")}
+              </span>
+            )}
             <LocaleSwitcher />
           </div>
           <TeaserPage
-            profile={profile}
+            profile={toTeaserProfile(profile)}
             steamId64={params.id}
             locale={params.locale}
             rarity={cachedRarity}
+            /* Сюда попадаем только когда доступ уже разрешён (ветка выше
+               перехватывает отсутствие доступа). Значит замок рисовать
+               нельзя — витрина здесь работает как экран ожидания. */
+            accessGranted
           />
         </div>
       );
@@ -98,15 +149,15 @@ export default async function ResultPage({ params }: Props) {
 
   return (
     <div className="min-h-screen">
-      <div className="absolute top-4 right-4 z-30">
-        <LocaleSwitcher />
-      </div>
-
+      {/* Переключатель языка отрисовывает сама панель вкладок: отдельным
+          плавающим блоком он накрывал правую вкладку, и на телефоне нажать её
+          было нельзя. Бейдж владельца едет тем же путём, рядом с ним. */}
       <ResultTabs
         portrait={portrait}
         profile={profile}
         steamId64={params.id}
         locale={params.locale}
+        isOwner={isOwner}
       />
 
       {/* Actions */}

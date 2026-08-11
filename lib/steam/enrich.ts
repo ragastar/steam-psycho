@@ -5,6 +5,17 @@ const STEAMSPY_BASE = "https://steamspy.com/api.php";
 const STORE_BASE = "https://store.steampowered.com/api";
 const DELAY_MS = 300;
 
+/**
+ * Потолок на число игр, по которым мы вообще ходим за данными.
+ *
+ * Раньше предела не было: библиотека на 45 000 игр (такие реально есть) — это
+ * 9000 пачек по 300 мс, то есть 45 минут одних пауз плюс 45 000 запросов к
+ * стороннему сервису. Пользователь отваливался по таймауту, а сервер продолжал
+ * молотить. Игры сверх потолка попадают в статистику по количеству и часам,
+ * но без цен и тегов — на итоговый портрет это почти не влияет.
+ */
+const MAX_ENRICHED = 300;
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -99,7 +110,7 @@ export async function enrichGames(
   }
 
   // Remaining games: fetch only SteamSpy for price (no Store API — saves time)
-  const remaining = sorted.slice(topN);
+  const remaining = sorted.slice(topN, MAX_ENRICHED);
   for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
     const batch = remaining.slice(i, i + BATCH_SIZE);
     const spyResults = await Promise.all(
@@ -124,6 +135,16 @@ export async function enrichGames(
 
     if (i + BATCH_SIZE < remaining.length) {
       await delay(DELAY_MS);
+    }
+  }
+
+  // Хвост сверх потолка проходит без запросов наружу: количество игр и часы
+  // сохраняются, цен и тегов у них нет.
+  const skipped = sorted.slice(MAX_ENRICHED);
+  if (skipped.length > 0) {
+    console.log(`[enrich] библиотека ${sorted.length} игр: обогащено ${MAX_ENRICHED}, пропущено ${skipped.length}`);
+    for (const game of skipped) {
+      enriched.push({ ...game, tags: {}, genres: [] });
     }
   }
 

@@ -63,6 +63,17 @@ function sqliteGet<T>(key: string): T | null {
   }
 }
 
+function sqliteDelete(key: string): void {
+  try {
+    ensureGateTable();
+    const db = getDb();
+    if (!db) return;
+    db.prepare("DELETE FROM gate_tokens WHERE key = ?").run(key);
+  } catch (err) {
+    console.error("[cache] sqliteDelete failed:", err);
+  }
+}
+
 function sqliteSet(key: string, value: unknown, ttlSeconds: number): void {
   try {
     ensureGateTable();
@@ -76,8 +87,18 @@ function sqliteSet(key: string, value: unknown, ttlSeconds: number): void {
   }
 }
 
-function isGateKey(key: string): boolean {
-  return key.startsWith("gate:");
+/**
+ * Что переживает перезапуск контейнера.
+ *
+ * Внешний кеш не настроен, поэтому всё живёт в памяти процесса. Раньше в SQLite
+ * писались только гейт-токены — и любой редеплой (а он идёт автоматически на
+ * каждый push в master) стирал разобранные профили: все, кто в этот момент ждал
+ * результат, получали «данные устарели, начните заново».
+ */
+const PERSISTENT_PREFIXES = ["gate:", "profile:", "cardstats:", "rarity:", "portrait:", "art:identity:"];
+
+function isPersistentKey(key: string): boolean {
+  return PERSISTENT_PREFIXES.some((p) => key.startsWith(p));
 }
 
 // --- Memory cache ---
@@ -161,7 +182,7 @@ export async function setCache<T>(key: string, value: T, ttlSeconds: number): Pr
   memSet(key, value, ttlSeconds);
 
   // Persist gate tokens to SQLite (survives container restarts)
-  if (isGateKey(key)) {
+  if (isPersistentKey(key)) {
     sqliteSet(key, value, ttlSeconds);
   }
 
@@ -174,13 +195,29 @@ export async function setCache<T>(key: string, value: T, ttlSeconds: number): Pr
   }
 }
 
+export async function deleteCache(key: string): Promise<void> {
+  memoryCache.delete(key);
+
+  // Тот же порядок, что у setCache/getCache: SQLite — только для ключей из
+  // PERSISTENT_PREFIXES. login: в этот список не входит, а getDb() не
+  // запоминает неудачу открытия базы — значит, безусловный вызов давал бы
+  // по две проваленных попытки открыть SQLite и лог "Failed to open SQLite"
+  // на каждый обмен токена.
+  if (isPersistentKey(key)) {
+    sqliteDelete(key);
+  }
+
+  const client = getRedis();
+  if (client) await client.del(key);
+}
+
 export async function getCache<T>(key: string): Promise<T | null> {
   // Try memory first (faster)
   const memResult = memGet<T>(key);
   if (memResult !== null) return memResult;
 
   // For gate keys, check SQLite before Redis (persists across restarts)
-  if (isGateKey(key)) {
+  if (isPersistentKey(key)) {
     const sqlResult = sqliteGet<T>(key);
     if (sqlResult !== null) {
       memSet(key, sqlResult, 3600); // warm memory cache
@@ -216,8 +253,21 @@ export async function incrementRateLimit(key: string, ttlSeconds: number): Promi
   }
 
   // Memory fallback for rate limiting
-  const existing = memGet<number>(key);
-  const newCount = (existing || 0) + 1;
-  memSet(key, newCount, ttlSeconds);
-  return newCount;
+  //
+  // Окно фиксированное: срок ставится при ПЕРВОМ инкременте и дальше не
+  // двигается — так же, как в ветке Redis выше (expire только при count === 1).
+  // Раньше здесь на каждый инкремент шёл memSet, и каждая новая попытка
+  // отодвигала конец окна на час вперёд: исчерпанная корзина не опустошалась,
+  // пока в неё стучится хоть кто-то чаще раза в час. Человек, следовавший
+  // совету «подожди и попробуй снова», продлевал собственную блокировку.
+  // Upstash не настроен, значит в проде работает именно эта ветка.
+  const entry = memoryCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) {
+    memSet(key, 1, ttlSeconds);
+    return 1;
+  }
+  // Значение правим на месте: expiresAt при этом остаётся прежним.
+  const next = (typeof entry.value === "number" ? entry.value : 0) + 1;
+  entry.value = next;
+  return next;
 }

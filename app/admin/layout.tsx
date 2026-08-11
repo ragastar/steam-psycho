@@ -1,7 +1,7 @@
 import "@/app/globals.css";
 
 export const metadata = {
-  title: "GamerType Admin",
+  title: "Задротометр — админка",
   robots: "noindex, nofollow",
 };
 

@@ -4,6 +4,7 @@ import { Resvg } from "@resvg/resvg-js";
 import type { CardPortrait } from "../llm/types";
 import type { AggregatedProfile } from "../aggregation/types";
 import { getRarityTheme } from "./styles";
+import { SITE_HOST } from "../site";
 
 let fontData: ArrayBuffer | null = null;
 
@@ -130,7 +131,7 @@ export async function renderCardPng(
           <span>{profile.stats.totalPlaytimeHours}h</span>
           <span>Spirit: {portrait.spirit_game}</span>
         </div>
-        <div style={{ fontSize: "16px", color: theme.accentColor, fontWeight: 600 }}>gamertype.fun</div>
+        <div style={{ fontSize: "16px", color: theme.accentColor, fontWeight: 600 }}>{SITE_HOST}</div>
       </div>
     </div>,
     {

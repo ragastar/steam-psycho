@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { Rarity } from "@/lib/llm/types";
+import { SITE_URL } from "@/lib/site";
 
 interface ShareButtonsProps {
   steamId64: string;
@@ -16,8 +17,7 @@ export function ShareButtons({ steamId64, archetype, rarity, emoji, locale }: Sh
   const t = useTranslations("share");
   const [copied, setCopied] = useState(false);
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://gamertype.fun";
-  const resultUrl = `${baseUrl}/${locale}/result/${steamId64}`;
+  const resultUrl = `${SITE_URL}/${locale}/result/${steamId64}`;
   const shareText = t(locale === "ru" ? "shareTextRu" : "shareTextEn", {
     emoji,
     archetype,

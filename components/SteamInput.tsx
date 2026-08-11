@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { LoadingAnimation } from "./LoadingAnimation";
 import { ErrorDisplay } from "./ErrorDisplay";
 
-interface Provider {
-  id: string;
-  name: string;
-  model: string;
-  available: boolean;
-}
-
+/**
+ * Выбор поставщика и подпись «работает на такой-то модели» с витрины убраны.
+ *
+ * Во-первых, они ничего не делали: /api/generate поставщика от браузера не
+ * принимает — переключатель был декорацией. Во-вторых, они рассказывали
+ * посетителю устройство системы: каким сервисом считается текст и какая модель
+ * настроена. Вместе с ними удалён /api/providers, отдававший этот список кому
+ * угодно без авторизации.
+ */
 export function SteamInput() {
   const t = useTranslations();
   const locale = useLocale();
@@ -21,21 +23,6 @@ export function SteamInput() {
   const [showHelp, setShowHelp] = useState(false);
   const [errorCode, setErrorCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<string>("");
-
-  useEffect(() => {
-    fetch("/api/providers")
-      .then((res) => res.json())
-      .then((data) => {
-        const available: Provider[] = data.providers.filter((p: Provider) => p.available);
-        setProviders(available);
-        if (available.length > 0 && !selectedProvider) {
-          setSelectedProvider(available[0].id);
-        }
-      })
-      .catch(() => {});
-  }, [selectedProvider]);
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -55,11 +42,9 @@ export function SteamInput() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input: trimmed,
-          locale,
-          provider: selectedProvider || undefined,
-        }),
+        // Поставщика браузер не выбирает: это решает сервер настройкой
+        // LLM_PROVIDER. Раньше поле отправлялось, но /api/analyze его не читал.
+        body: JSON.stringify({ input: trimmed, locale }),
         signal: controller.signal,
       });
 
@@ -82,7 +67,7 @@ export function SteamInput() {
       }
       setLoading(false);
     }
-  }, [input, locale, selectedProvider, router]);
+  }, [input, locale, router]);
 
   const handleRetry = useCallback(() => {
     setErrorCode("");
@@ -95,27 +80,48 @@ export function SteamInput() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full space-y-4">
-      <div className="flex gap-2">
+      {/*
+        На телефоне поле и кнопка идут друг под другом, а не в строку.
+        Замерено на ширине 390: в строку кнопка не влезала и уезжала за край
+        экрана на 26 пикселей — половина надписи была не видна и нажать её
+        было нельзя. С 640 пикселей места хватает, там возвращаем строку.
+
+        min-w-0 на поле обязателен: без него поле отказывается сжиматься
+        (у полей ввода своя ширина по умолчанию) и снова выдавливает кнопку.
+
+        inputMode/autoComplete — чтобы телефон не подсовывал автозамену и
+        заглавную букву в начале ссылки на профиль.
+      */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={t("landing.inputPlaceholder")}
-          className="flex-1 px-4 py-3 bg-gray-900/80 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+          autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          className="min-w-0 flex-1 px-4 py-3 bg-gray-900/80 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
         />
         <button
           type="submit"
-          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold rounded-xl hover:from-purple-500 hover:to-cyan-500 transition-all whitespace-nowrap shadow-lg shadow-purple-600/20"
+          className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold rounded-xl hover:from-purple-500 hover:to-cyan-500 transition-all whitespace-nowrap shadow-lg shadow-purple-600/20"
         >
           {t("landing.submitButton")}
         </button>
       </div>
 
       <div className="text-center">
+        {/*
+          py-2 не для красоты: без него у ссылки высота 16 пикселей, и на
+          телефоне в неё попадают через раз. Отступы увеличивают область
+          нажатия, не меняя вид.
+        */}
         <button
           type="button"
           onClick={() => setShowHelp(!showHelp)}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
+          className="inline-block px-3 py-2 text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
         >
           {t("landing.helpToggle")}
         </button>
@@ -128,34 +134,6 @@ export function SteamInput() {
           </div>
         )}
       </div>
-
-      {providers.length > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-xs text-gray-500">{t("landing.aiModel")}:</span>
-          <div className="flex gap-1">
-            {providers.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setSelectedProvider(p.id)}
-                className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                  selectedProvider === p.id
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-800 text-gray-400 hover:text-white"
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {providers.length === 1 && (
-        <p className="text-xs text-gray-600 text-center">
-          {t("landing.poweredBy", { model: providers[0].name })}
-        </p>
-      )}
 
       {errorCode && (
         <ErrorDisplay code={errorCode} onRetry={handleRetry} />

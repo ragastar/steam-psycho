@@ -4,9 +4,9 @@ import { getArtFilePath, artFileExists } from "@/lib/art/image-client";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const steamId64 = params.id;
+  const { id: steamId64 } = await params;
 
   if (!artFileExists(steamId64)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

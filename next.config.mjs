@@ -12,9 +12,8 @@ const nextConfig = {
       { protocol: "https", hostname: "cdn.akamai.steamstatic.com" },
     ],
   },
-  experimental: {
-    serverComponentsExternalPackages: ["@resvg/resvg-js", "better-sqlite3"],
-  },
+  // В Next 15 настройка переехала из experimental и сменила имя.
+  serverExternalPackages: ["@resvg/resvg-js", "better-sqlite3"],
 };
 
 export default withNextIntl(nextConfig);

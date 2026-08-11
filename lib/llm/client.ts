@@ -1,12 +1,14 @@
-import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import type { AggregatedProfile } from "../aggregation/types";
 import type { CardPortrait, Rarity } from "./types";
 import type { CardStats } from "../aggregation/aggregate";
 import { CardPortraitSchema } from "./types";
 import { getSystemPrompt, buildUserPrompt } from "./prompt";
+import { generateWithAnthropic as generatePortraitViaAnthropic } from "./providers/anthropic";
+import { generateWithBridge, BridgeUnavailableError } from "./providers/claude-bridge";
+import { extractJSON } from "./json";
 
-export type LLMProvider = "anthropic" | "openai";
+export type LLMProvider = "claude-bridge" | "anthropic" | "openai";
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -14,92 +16,58 @@ export interface LLMConfig {
 }
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
-  anthropic: "claude-sonnet-4-20250514",
+  // Должно совпадать с BRIDGE_MODEL в tools/llm-bridge/server.mjs и с
+  // умолчанием в deploy/llm-bridge-setup.sh. Раньше здесь стояло
+  // "subscription" — красиво, но неверно: getAvailableProviders() показывал
+  // в админке «модель subscription», хотя карточки на самом деле делает
+  // claude-sonnet-5. Реальную отработавшую модель мост возвращает в ответе,
+  // и она приоритетнее этого умолчания.
+  "claude-bridge": "claude-sonnet-5",
+  // Должно совпадать с DEFAULT_MODEL в providers/anthropic.ts,
+  // иначе статистика и админка покажут не ту модель, что отработала.
+  anthropic: "claude-opus-5",
   openai: "openai/gpt-4o-mini",
 };
 
-function getAvailableProvider(): LLMProvider {
-  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
-  if (process.env.OPENAI_API_KEY) return "openai";
-  throw new Error("No LLM API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.");
-}
+const PROVIDERS: LLMProvider[] = ["claude-bridge", "anthropic", "openai"];
 
-function resolveConfig(provider?: LLMProvider): LLMConfig {
-  const resolved = provider || (process.env.LLM_PROVIDER as LLMProvider) || getAvailableProvider();
-  return {
-    provider: resolved,
-    model: DEFAULT_MODELS[resolved],
-  };
-}
-
-// --- JSON extraction ---
-
-function extractJSON(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (match) return JSON.parse(match[1].trim());
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) return JSON.parse(jsonMatch[0]);
-    throw new Error("No valid JSON found in LLM response");
+/**
+ * Раньше поставщик угадывался по наличию ключа, причём Anthropic был
+ * приоритетнее. Пример настроек предлагал заполнить оба ключа — и запросы
+ * молча уходили напрямую в Anthropic мимо OpenRouter. Теперь выбор явный,
+ * а неизвестное значение падает сразу, а не в середине генерации.
+ */
+export function resolveConfig(provider?: LLMProvider): LLMConfig {
+  const fromEnv = process.env.LLM_PROVIDER?.trim();
+  if (!provider && fromEnv && !PROVIDERS.includes(fromEnv as LLMProvider)) {
+    throw new Error(
+      `LLM_PROVIDER="${fromEnv}" — неизвестный поставщик. Допустимо: ${PROVIDERS.join(", ")}`,
+    );
   }
+
+  let resolved = provider || (fromEnv as LLMProvider | undefined);
+  if (!resolved) {
+    // По умолчанию идём через OpenRouter — под него написан весь проект.
+    if (process.env.OPENAI_API_KEY) resolved = "openai";
+    else if (process.env.ANTHROPIC_API_KEY) resolved = "anthropic";
+    else throw new Error("Не задан ни один ключ LLM: нужен OPENAI_API_KEY (OpenRouter) или ANTHROPIC_API_KEY.");
+  }
+
+  // OPENROUTER_MODEL раньше читался только в переводчике, а для портрета
+  // модель была зашита в коде — смена настройки молча ничего не делала.
+  const model =
+    resolved === "openai"
+      ? process.env.OPENROUTER_MODEL?.trim() || DEFAULT_MODELS.openai
+      : resolved === "anthropic"
+        ? process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODELS.anthropic
+        : DEFAULT_MODELS["claude-bridge"];
+
+  return { provider: resolved, model };
 }
 
 // --- Anthropic (Claude) ---
-
-async function generateWithAnthropic(
-  profile: AggregatedProfile,
-  cardStats: CardStats,
-  rarity: Rarity,
-  locale: string,
-  model: string,
-): Promise<CardPortrait> {
-  const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    timeout: 45_000,
-  });
-
-  const response = await client.messages.create({
-    model,
-    max_tokens: 5000,
-    system: getSystemPrompt(locale),
-    messages: [{ role: "user", content: buildUserPrompt(profile, cardStats, rarity) }],
-  });
-
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text in Anthropic response");
-  }
-
-  const json = extractJSON(textBlock.text);
-  const parsed = CardPortraitSchema.safeParse(json);
-  if (parsed.success) return parsed.data;
-
-  // Retry — wrap in try/catch to avoid doubling timeout
-  try {
-    const retry = await client.messages.create({
-      model,
-      max_tokens: 5000,
-      system: getSystemPrompt(locale),
-      messages: [
-        { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
-        { role: "assistant", content: textBlock.text },
-        {
-          role: "user",
-          content: `The JSON was invalid. Errors: ${parsed.error.issues.map((e) => e.message).join(", ")}. Fix and return ONLY valid JSON.`,
-        },
-      ],
-    });
-
-    const retryText = retry.content.find((b) => b.type === "text");
-    if (!retryText || retryText.type !== "text") throw new Error("No text in retry");
-    return CardPortraitSchema.parse(extractJSON(retryText.text));
-  } catch (retryErr) {
-    console.error("[llm] Anthropic retry failed:", retryErr instanceof Error ? retryErr.message : retryErr);
-    throw new Error("LLM retry failed: " + (retryErr instanceof Error ? retryErr.message : "unknown"));
-  }
-}
+// Реализация вынесена в providers/anthropic.ts: там кеширование системного
+// промпта, схема ответа и обработка отказа классификатора.
 
 // --- OpenAI ---
 
@@ -161,37 +129,94 @@ async function generateWithOpenAI(
 
 // --- Public API ---
 
+export interface GenerationResult {
+  portrait: CardPortrait;
+  /** Что реально отработало — статистика раньше писала значение из настроек. */
+  provider: LLMProvider;
+  model: string;
+  /** Расход токенов: позволяет считать реальную стоимость портрета. */
+  usage?: { input: number; output: number; cachedInput: number };
+}
+
+/**
+ * Кого пробовать, когда мост отказал. Порядок: сначала оплачиваемый ключ
+ * Anthropic (та же модель, гарантированный формат), потом OpenRouter.
+ */
+function pickFallback(): LLMProvider | null {
+  if (process.env.ANTHROPIC_API_KEY?.trim()) return "anthropic";
+  if (process.env.OPENAI_API_KEY?.trim()) return "openai";
+  return null;
+}
+
 export async function generatePortrait(
   profile: AggregatedProfile,
   cardStats: CardStats,
   rarity: Rarity,
   locale: string,
   provider?: LLMProvider,
-): Promise<CardPortrait> {
+): Promise<GenerationResult> {
   const config = resolveConfig(provider);
+  const model = config.model!;
 
-  switch (config.provider) {
-    case "anthropic":
-      return generateWithAnthropic(profile, cardStats, rarity, locale, config.model!);
-    case "openai":
-      return generateWithOpenAI(profile, cardStats, rarity, locale, config.model!);
-    default:
-      throw new Error(`Unknown LLM provider: ${config.provider}`);
+  if (config.provider === "claude-bridge") {
+    try {
+      const result = await generateWithBridge(
+        getSystemPrompt(locale),
+        buildUserPrompt(profile, cardStats, rarity),
+      );
+      return { portrait: result.portrait, provider: "claude-bridge", model: result.model };
+    } catch (err) {
+      // Подменяем запасным только отказ моста. Ошибка в нашем коде должна
+      // падать честно, иначе она молча спрячется за счётом за токены.
+      if (!(err instanceof BridgeUnavailableError)) throw err;
+
+      const fallback = pickFallback();
+      console.warn(`[llm] ${err.message}; ухожу на ${fallback ?? "никого — запасных ключей нет"}`);
+      if (!fallback) throw err;
+
+      return generatePortrait(profile, cardStats, rarity, locale, fallback);
+    }
   }
+
+  if (config.provider === "anthropic") {
+    const result = await generatePortraitViaAnthropic(
+      getSystemPrompt(locale),
+      buildUserPrompt(profile, cardStats, rarity),
+    );
+    return {
+      portrait: result.portrait,
+      provider: "anthropic",
+      model: result.model,
+      usage: {
+        input: result.inputTokens,
+        output: result.outputTokens,
+        cachedInput: result.cachedInputTokens,
+      },
+    };
+  }
+
+  const portrait = await generateWithOpenAI(profile, cardStats, rarity, locale, model);
+  return { portrait, provider: config.provider, model };
 }
 
 export function getAvailableProviders(): { id: LLMProvider; name: string; model: string; available: boolean }[] {
   return [
     {
+      id: "claude-bridge",
+      name: "Claude (подписка через мост)",
+      model: DEFAULT_MODELS["claude-bridge"],
+      available: !!process.env.CLAUDE_BRIDGE_TOKEN,
+    },
+    {
       id: "anthropic",
       name: "Claude (Anthropic)",
-      model: DEFAULT_MODELS.anthropic,
+      model: process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODELS.anthropic,
       available: !!process.env.ANTHROPIC_API_KEY,
     },
     {
       id: "openai",
-      name: "GPT (OpenAI)",
-      model: DEFAULT_MODELS.openai,
+      name: "GPT (OpenRouter)",
+      model: process.env.OPENROUTER_MODEL?.trim() || DEFAULT_MODELS.openai,
       available: !!process.env.OPENAI_API_KEY,
     },
   ];

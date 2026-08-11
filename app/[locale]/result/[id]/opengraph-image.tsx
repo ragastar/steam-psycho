@@ -5,9 +5,10 @@ import { portraitKey, profileKey } from "@/lib/cache/keys";
 import type { CardPortrait } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 import { getRarityTheme } from "@/lib/card/styles";
+import { SITE_HOST, SITE_NAME } from "@/lib/site";
 
 export const runtime = "nodejs";
-export const alt = "GamerType Card";
+export const alt = "Карточка Задротометра";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -24,7 +25,8 @@ function stripEmoji(str: string): string {
   return str.replace(/[^\x00-\x7F\u00A0-\u024F\u0400-\u04FF\u2000-\u206F\u2070-\u209F\u20A0-\u20CF\u2100-\u214F]/g, "").trim();
 }
 
-export default async function OgImage({ params }: { params: { id: string; locale: string } }) {
+export default async function OgImage({ params: rawParams }: { params: Promise<{ id: string; locale: string }> }) {
+  const params = await rawParams;
   try {
     const portrait = await getCache<CardPortrait>(portraitKey(params.id, params.locale));
     const profile = await getCache<AggregatedProfile>(profileKey(params.id));
@@ -44,7 +46,7 @@ export default async function OgImage({ params }: { params: { id: string; locale
               fontSize: 48,
             }}
           >
-            GamerType
+            {SITE_NAME}
           </div>
         ),
         { ...size },
@@ -87,7 +89,7 @@ export default async function OgImage({ params }: { params: { id: string; locale
                   color: "#fff",
                 }}
               >
-                GT
+                З
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <div style={{ fontSize: "18px", color: "#999" }}>{profile.player.name}</div>
@@ -161,7 +163,7 @@ export default async function OgImage({ params }: { params: { id: string; locale
               <span>{profile.stats.totalPlaytimeHours}h</span>
               <span>Spirit: {stripEmoji(portrait.spirit_game)}</span>
             </div>
-            <div style={{ fontSize: "16px", color: theme.accentColor, fontWeight: 600 }}>gamertype.fun</div>
+            <div style={{ fontSize: "16px", color: theme.accentColor, fontWeight: 600 }}>{SITE_HOST}</div>
           </div>
         </div>
       ),
@@ -183,7 +185,7 @@ export default async function OgImage({ params }: { params: { id: string; locale
             fontSize: 48,
           }}
         >
-          GamerType
+          {SITE_NAME}
         </div>
       ),
       { ...size },

@@ -26,6 +26,23 @@ export function gateTokenKey(token: string): string {
   return `gate:${token}`;
 }
 
+/**
+ * Код входа, выданный ботом. Живёт минуты: это одноразовый пропуск,
+ * а не сессия.
+ */
+export function loginCodeKey(code: string): string {
+  return `logincode:${code}`;
+}
+
+/**
+ * Попытки ввода кода с одного адреса. Отдельный ключ от rateLimitKey: у
+ * разбора библиотеки потолок про деньги, а здесь — про перебор пропуска
+ * в чужой аккаунт, и делить одну корзину им нельзя.
+ */
+export function loginAttemptKey(ip: string): string {
+  return `ratelimit:logincode:${ip}`;
+}
+
 export function cardStatsKey(steamId64: string): string {
   return `cardstats:v1:${steamId64}`;
 }

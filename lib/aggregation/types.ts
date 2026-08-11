@@ -53,16 +53,18 @@ export interface AggregatedProfile {
     freePercentage: number;
   };
   platforms: {
+    // Steam не отдаёт время на Steam Deck отдельно от Linux, поэтому Deck
+    // здесь нет: раньше он «считался» как 30% линуксового времени.
     windowsPercentage: number;
+    macPercentage: number;
     linuxPercentage: number;
-    deckPercentage: number;
   };
   timeline: {
-    accountAge: number; // years
-    peakYear: number | null;
-    peakMonthlyHours: number;
+    accountAge: number; // years, 0 если профиль скрывает дату регистрации
+    avgMonthlyHours: number;
     currentMonthlyHours: number;
-    trend: "rising" | "stable" | "declining" | "inactive";
+    // "unknown" — возраст аккаунта неизвестен, сравнивать не с чем
+    trend: "rising" | "stable" | "declining" | "inactive" | "unknown";
     lastActivityDate: string | null;
   };
   social: {
@@ -86,13 +88,18 @@ export interface AggregatedProfile {
   patterns: {
     genreConcentration: number; // top-1 genre % of total
     bingeStyle: "binger" | "sampler" | "balanced";
+    // Считается от игр, по которым есть данные о жанрах (топ-30),
+    // а не от всей библиотеки — иначе результат всегда занижен в разы.
     indiePercentage: number;
-    medianReleaseYear: number | null;
+    indieSampleSize: number;
   };
   ranks: {
     hoursPercentile: number;
     librarySizePercentile: number;
     concentrationPercentile: number;
     veteranPercentile: number;
+    // true — грубая оценка по захардкоженным порогам (выборки ещё мало).
+    // false — посчитано по реальной статистике прошедших тест.
+    estimated: boolean;
   };
 }

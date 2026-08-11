@@ -1,19 +1,26 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { TelegramGate } from "./TelegramGate";
-import type { AggregatedProfile } from "@/lib/aggregation/types";
+import type { TeaserProfile } from "@/lib/access/redact";
 import type { Rarity } from "@/lib/llm/types";
 
 interface TeaserPageProps {
-  profile: AggregatedProfile;
+  /** Урезанная витрина, а не полный профиль — см. lib/access/redact. */
+  profile: TeaserProfile;
   steamId64: string;
   locale: string;
   rarity: Rarity;
+  /**
+   * Доступ разрешён сервером, карточка просто ещё не сгенерирована.
+   * Витрина в этом случае показывается как экран ожидания, а не как замок.
+   */
+  accessGranted?: boolean;
 }
 
 const RARITY_BORDER: Record<Rarity, string> = {
@@ -40,16 +47,22 @@ const FEATURES = [
   { icon: "\uD83D\uDCCA", key: "feature5" },
 ] as const;
 
-export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPageProps) {
+export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted = false }: TeaserPageProps) {
   const t = useTranslations();
   const router = useRouter();
-  const gateDisabled = process.env.NEXT_PUBLIC_DISABLE_GATE === "true";
   const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState("");
+  // Не текст ошибки, а её ПРИЧИНА: от неё зависит, что предлагать делать.
+  // Повтор помогает при отказе ИИ, но при протухших данных Steam он зациклит
+  // посетителя на одном и том же отказе — там нужен новый разбор аккаунта.
+  const [failure, setFailure] = useState<"" | "retryable" | "expired">("");
+  // Одна генерация на монтирование: каждый лишний вызов — это платный запрос.
+  const startedRef = useRef(false);
 
   const triggerGeneration = useCallback(async () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
     setGenerating(true);
-    setError("");
+    setFailure("");
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -58,15 +71,17 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.message || "Generation failed");
+        setFailure(data.code === "DATA_EXPIRED" ? "expired" : "retryable");
         setGenerating(false);
+        startedRef.current = false; // Дать повторить после ошибки.
         return;
       }
       // Portrait generated — reload page to show full result
       router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      setFailure("retryable");
       setGenerating(false);
+      startedRef.current = false;
     }
   }, [steamId64, locale, router]);
 
@@ -74,10 +89,18 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
     triggerGeneration();
   }, [triggerGeneration]);
 
-  // Auto-trigger if gate disabled
-  if (gateDisabled && !generating) {
-    triggerGeneration();
-  }
+  // Доступ уже разрешён сервером, а карточки ещё нет — запускаем генерацию
+  // сами, иначе посетитель навсегда застревает на витрине: раньше генерацию
+  // запускал ТОЛЬКО момент разблокировки гейта, а при открытом доступе гейта
+  // нет и запускать некому.
+  //
+  // Именно в эффекте, а не в теле отрисовки: прежний автозапуск стоял в теле
+  // и мог сработать несколько раз за один рендер — каждый раз оплачиваемым
+  // вызовом. startedRef внутри triggerGeneration страхует от повтора, в том
+  // числе от двойного прогона эффектов в строгом режиме разработки.
+  useEffect(() => {
+    if (accessGranted) triggerGeneration();
+  }, [accessGranted, triggerGeneration]);
 
   const borderClass = RARITY_BORDER[rarity];
   const badgeClass = RARITY_BADGE_BG[rarity];
@@ -105,9 +128,6 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
           </div>
           <h2 className="text-xl font-bold text-white">{t("teaser.generating")}</h2>
           <p className="text-gray-400 text-sm">{t("teaser.generatingHint")}</p>
-          {error && (
-            <p className="text-red-400 text-sm">{error}</p>
-          )}
         </motion.div>
       </div>
     );
@@ -116,6 +136,44 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
   return (
     <div className="min-h-screen">
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        {/*
+          Отказ генерации показывается ЗДЕСЬ, а не только внутри крутилки.
+          Раньше текст ошибки жил в ветке `generating`, которую этот же код
+          гасит вместе с записью ошибки, — то есть увидеть его было нельзя
+          никогда. Посетитель получал витрину «что тебя ждёт» вместо карточки
+          и никакого объяснения: ровно так выглядел сбой моста 2026-08-11.
+        */}
+        {failure && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            role="alert"
+            className="rounded-2xl border border-red-500/40 bg-red-950/40 p-5 space-y-3 text-center"
+          >
+            <h2 className="text-lg font-bold text-red-200">
+              {t(failure === "expired" ? "teaser.expired" : "teaser.failed")}
+            </h2>
+            <p className="text-sm text-red-200/70">
+              {t(failure === "expired" ? "teaser.expiredHint" : "teaser.failedHint")}
+            </p>
+            {failure === "expired" ? (
+              <Link
+                href={`/${locale}`}
+                className="inline-block px-5 py-2.5 rounded-lg bg-red-500 hover:bg-red-400 text-white text-sm font-semibold transition-colors"
+              >
+                {t("teaser.reanalyze")}
+              </Link>
+            ) : (
+              <button
+                onClick={triggerGeneration}
+                className="px-5 py-2.5 rounded-lg bg-red-500 hover:bg-red-400 text-white text-sm font-semibold transition-colors"
+              >
+                {t("teaser.retry")}
+              </button>
+            )}
+          </motion.div>
+        )}
+
         {/* Profile card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -202,7 +260,12 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <TelegramGate steamId64={steamId64} locale={locale} onUnlock={handleUnlock} />
+          <TelegramGate
+            steamId64={steamId64}
+            locale={locale}
+            onUnlock={handleUnlock}
+            accessGranted={accessGranted}
+          />
         </motion.div>
       </div>
     </div>

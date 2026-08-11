@@ -6,21 +6,26 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run test",
+    "prompt:dump": "tsx scripts/dump-prompt.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.77.0",
+    "@anthropic-ai/sdk": "^0.116.0",
     "@resvg/resvg-js": "^2.6.2",
     "@upstash/redis": "^1.36.2",
     "better-sqlite3": "^12.6.2",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.2",
     "grammy": "^1.40.0",
-    "next": "14.2.35",
+    "next": "^16.3.0",
     "next-intl": "^4.8.3",
     "openai": "^6.22.0",
-    "react": "^18",
-    "react-dom": "^18",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "recharts": "^3.7.0",
     "satori": "^0.19.2",
     "tailwind-merge": "^3.5.0",
@@ -29,12 +34,14 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "tsx": "^4.23.12",
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
