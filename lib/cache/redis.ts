@@ -64,10 +64,14 @@ function sqliteGet<T>(key: string): T | null {
 }
 
 function sqliteDelete(key: string): void {
-  ensureGateTable();
-  const db = getDb();
-  if (!db) return;
-  db.prepare("DELETE FROM gate_tokens WHERE key = ?").run(key);
+  try {
+    ensureGateTable();
+    const db = getDb();
+    if (!db) return;
+    db.prepare("DELETE FROM gate_tokens WHERE key = ?").run(key);
+  } catch (err) {
+    console.error("[cache] sqliteDelete failed:", err);
+  }
 }
 
 function sqliteSet(key: string, value: unknown, ttlSeconds: number): void {
@@ -193,11 +197,16 @@ export async function setCache<T>(key: string, value: T, ttlSeconds: number): Pr
 
 export async function deleteCache(key: string): Promise<void> {
   memoryCache.delete(key);
-  try {
+
+  // Тот же порядок, что у setCache/getCache: SQLite — только для ключей из
+  // PERSISTENT_PREFIXES. login: в этот список не входит, а getDb() не
+  // запоминает неудачу открытия базы — значит, безусловный вызов давал бы
+  // по две проваленных попытки открыть SQLite и лог "Failed to open SQLite"
+  // на каждый обмен токена.
+  if (isPersistentKey(key)) {
     sqliteDelete(key);
-  } catch (err) {
-    console.error("[cache] deleteCache failed:", err);
   }
+
   const client = getRedis();
   if (client) await client.del(key);
 }
