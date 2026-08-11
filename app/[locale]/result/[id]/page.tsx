@@ -12,6 +12,7 @@ import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
 import { getAccessLevel } from "@/lib/access/entitlement";
 import { toTeaserProfile } from "@/lib/access/redact";
+import { toFreePortrait } from "@/lib/access/redact-portrait";
 import { getCurrentAccountId } from "@/lib/identity/session";
 import { accountOwnsSteamId } from "@/lib/identity/store";
 import { SITE_URL, SITE_NAME } from "@/lib/site";
@@ -31,7 +32,14 @@ export async function generateMetadata({ params: rawParams }: Props): Promise<Me
   }
 
   const title = `${profile.player.name} — "${portrait.primaryArchetype.name}" | ${SITE_NAME}`;
-  const description = portrait.quote;
+
+  // Цитата — платная часть карточки, а описание страницы попадает в исходник
+  // всем подряд, включая тех, кто разбор не открывал: заголовок страницы читается
+  // без всякого CSS. Без доступа описанием работает бесплатный вердикт — самый
+  // суровый роаст, то самое, чем и делятся.
+  const access = await getAccessLevel(params.id);
+  const description =
+    access === "full" ? portrait.quote : (toFreePortrait(portrait).roasts[0]?.text ?? portrait.title);
 
   return {
     title,
@@ -69,6 +77,13 @@ export default async function ResultPage({ params: rawParams }: Props) {
   const isOwner = currentAccountId ? accountOwnsSteamId(currentAccountId, params.id) : false;
 
   if (access !== "full" && profile) {
+    // Единственная дверь наружу без доступа: платного текста в этом объекте уже
+    // нет — не «размыт», а отсутствует (lib/access/redact-portrait). Сегодня
+    // витрина берёт отсюда только редкость; сами блоки карточки с пустышками
+    // под размытием подключает следующая задача плана.
+    const free = portrait ? toFreePortrait(portrait) : null;
+    // Редкость карточки надёжнее отдельного кеша: он живёт меньше портрета, и
+    // после его протухания витрина показывала бы «common» на легендарной карте.
     const cachedRarity = await getCache<Rarity>(rarityKey(params.id));
     return (
       <div className="min-h-screen">
@@ -84,7 +99,7 @@ export default async function ResultPage({ params: rawParams }: Props) {
           profile={toTeaserProfile(profile)}
           steamId64={params.id}
           locale={params.locale}
-          rarity={cachedRarity ?? "common"}
+          rarity={free?.rarity ?? cachedRarity ?? "common"}
         />
       </div>
     );

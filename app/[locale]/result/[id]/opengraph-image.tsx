@@ -4,6 +4,7 @@ import { portraitKey, profileKey } from "@/lib/cache/keys";
 import type { CardPortrait } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 import { getRarityTheme } from "@/lib/card/styles";
+import { toFreePortrait } from "@/lib/access/redact-portrait";
 import { SITE_HOST, SITE_NAME } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -52,7 +53,11 @@ export default async function OgImage({ params: rawParams }: { params: Promise<{
     }
 
     const theme = getRarityTheme(portrait.rarity);
-    const firstRoast = portrait.roasts[0];
+    // Картинку превью отдают кому угодно по одной ссылке, без входа и без
+    // проверки права, — значит в ней может быть только бесплатная часть.
+    // Первый роаст в карточке платный через раз, а бесплатный ровно один:
+    // самый суровый. Он же и лучшая приманка.
+    const freeRoast = toFreePortrait(portrait).roasts[0];
     const topStats = getTopStats(portrait.stats);
 
     return new ImageResponse(
@@ -137,7 +142,7 @@ export default async function OgImage({ params: rawParams }: { params: Promise<{
 
           {/* Roast */}
           <div style={{ display: "flex", flexDirection: "column", marginTop: "8px" }}>
-            {firstRoast && (
+            {freeRoast && (
               <div
                 style={{
                   display: "flex",
@@ -149,7 +154,7 @@ export default async function OgImage({ params: rawParams }: { params: Promise<{
                   borderLeft: `4px solid ${theme.accentColor}`,
                 }}
               >
-                <span style={{ fontSize: "16px", color: "#ccc" }}>{stripEmoji(firstRoast.text)}</span>
+                <span style={{ fontSize: "16px", color: "#ccc" }}>{stripEmoji(freeRoast.text)}</span>
               </div>
             )}
           </div>
