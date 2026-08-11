@@ -8,6 +8,16 @@ export const CACHE_TTL = {
   rateLimit: 3600,              // 1 hour
   gate: 24 * 3600,              // 24 hours
   artImage: 30 * 24 * 3600,    // 30 days
+  /**
+   * Купленный разбор. «Вечно» — это очень долгий срок, а не отдельный
+   * механизм: setCache принимает срок числом и другого способа не знает.
+   *
+   * Десять лет выбраны как заведомо больше срока жизни самого продукта. Ключи
+   * portrait:/profile:/cardstats:/rarity: входят в PERSISTENT_PREFIXES
+   * (lib/cache/redis.ts) и переживают перезапуск контейнера, так что срок
+   * действительно доживёт до следующего визита покупателя.
+   */
+  purchased: 10 * 365 * 24 * 3600, // 10 years
 } as const;
 
 export function portraitKey(steamId64: string, locale: string): string {

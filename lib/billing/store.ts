@@ -265,3 +265,32 @@ export function hasEntitlement(accountId: number, steamId64: string): boolean {
     return false;
   }
 }
+
+/**
+ * Куплен ли этот разбор хоть кем-нибудь.
+ *
+ * Вопрос не о доступе, а о ХРАНЕНИИ: карточка и разобранный профиль лежат в
+ * кеше по steamId и общие для всех, кто эту страницу открывает. Показывать их
+ * решает hasEntitlement для конкретного аккаунта; а вот выбрасывать через сутки
+ * то, за что кто-то заплатил, нельзя независимо от того, кто именно платил.
+ *
+ * Недоступная база — false, как у соседей: не сохранить надолго хуже, чем
+ * уронить генерацию, но это всего лишь срок в кеше, а не доступ.
+ */
+export function steamIdHasEntitlement(steamId64: string): boolean {
+  const db = getBillingDb();
+  if (!db) return false;
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const row = db
+      .prepare(
+        `SELECT 1 FROM entitlements
+         WHERE steam_id64 = ? AND (expires_at IS NULL OR expires_at > ?) LIMIT 1`,
+      )
+      .get(steamId64, now);
+    return row !== undefined;
+  } catch (err) {
+    console.error("[billing] проверка права на разбор не удалась:", err);
+    return false;
+  }
+}

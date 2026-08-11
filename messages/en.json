@@ -376,5 +376,31 @@
     "alreadyOwned": "You already own this read — refreshing the page.",
     "failed": "Couldn't start the payment. Give it another go.",
     "unavailable": "Payments aren't hooked up yet — there's nothing to buy right now."
+  },
+  "pay": {
+    "testMode": "TEST MODE — nothing is charged",
+    "testModeHint": "A practice checkout. It never touches your card: the payment is pretend, the access you get is real.",
+    "title": "Checkout",
+    "subject": "Read for {name}",
+    "amount": "Total",
+    "pay": "Pay {price} ₽",
+    "decline": "Bank declines",
+    "leave": "Leave without paying",
+    "sending": "Talking to the bank...",
+    "failed": "The confirmation never left. Give it another go.",
+    "closed": "This order is already closed — there's nothing left to pay.",
+    "backToResult": "Back to the read",
+    "disclaimer": "Entertainment, not a psychologist's report. You're buying a joke about yourself, not a diagnosis.",
+    "return": {
+      "title": "Back from checkout",
+      "waiting": "Waiting for the bank to confirm...",
+      "waitingHint": "Usually a couple of seconds. Best to leave this page open.",
+      "paid": "Payment confirmed — opening your full read.",
+      "declined": "The bank declined the payment. Nothing was charged, the read stays free.",
+      "delayed": "The bank is taking its time. It happens: the money is gone, the notice is still in transit.",
+      "iPaid": "I've paid",
+      "checking": "Checking...",
+      "stillWaiting": "Still no confirmation. Check back in a minute — access opens on its own."
+    }
   }
 }

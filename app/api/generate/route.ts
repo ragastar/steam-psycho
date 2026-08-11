@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { generatePortrait } from "@/lib/llm/client";
 import { applyComputedFacts } from "@/lib/llm/facts";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
+import { persistPurchased } from "@/lib/cache/purchased";
+import { steamIdHasEntitlement } from "@/lib/billing/store";
 import { CACHE_TTL, portraitKey, profileKey, cardStatsKey, rarityKey, rateLimitKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
@@ -93,7 +95,21 @@ export async function POST(req: Request) {
       || selectCardIdentity(profile, cardStats, steamId64);
 
     // 5. Cache portrait
-    await setCache(portraitKey(steamId64, locale), portrait, CACHE_TTL.portrait);
+    //
+    // Купленный разбор хранится очень долго, а не сутки. Право проверяется на
+    // ЛЮБОЙ аккаунт: карточка в кеше одна на всех, кто открывает эту страницу,
+    // и выбрасывать через сутки то, за что кто-то заплатил, нельзя. Второй
+    // конец этой же заботы — в вебхуке (lib/cache/purchased.ts): к моменту
+    // покупки карточка уже лежит, и сюда исполнение больше не заходит.
+    const purchased = steamIdHasEntitlement(steamId64);
+    await setCache(
+      portraitKey(steamId64, locale),
+      portrait,
+      purchased ? CACHE_TTL.purchased : CACHE_TTL.portrait,
+    );
+    // Спутники карточки (разобранный профиль, цифры, редкость) живут сутки и
+    // без них страница отвечает «данные устарели». Купленному это не годится.
+    if (purchased) await persistPurchased(steamId64);
 
     logAnalysis({
       steamId64, locale, cached: false, ipHash,

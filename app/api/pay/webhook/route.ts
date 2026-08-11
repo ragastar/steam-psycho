@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProvider, PAYMENT_SIGNATURE_HEADER, MIN_WEBHOOK_SECRET_LENGTH } from "@/lib/billing/provider";
 import { billingAvailable, findOrder, markCancelled, markPaid } from "@/lib/billing/store";
+import { persistPurchased } from "@/lib/cache/purchased";
 
 /**
  * Подтверждение оплаты от кассы. Единственное место, где заказ становится
@@ -98,6 +99,20 @@ export async function POST(req: Request) {
   }
 
   const result = markPaid(order.id, verified.providerOrderId);
+
+  if (result === "granted") {
+    // Право выдано — теперь купленное обязано пережить сутки. Продлевать надо
+    // именно здесь: карточка легла в кеш ещё на бесплатном вердикте, и
+    // генерации, которая могла бы положить её заново, больше не будет.
+    //
+    // Любая осечка тут пишется в лог, но НЕ портит ответ: право уже в базе, а
+    // неудачный ответ заставил бы кассу слать подтверждение снова.
+    try {
+      await persistPurchased(order.steamId64);
+    } catch (err) {
+      console.error(`[pay] заказ ${order.id} оплачен, но продлить хранение не вышло:`, err);
+    }
+  }
 
   // "already" — штатный исход: кассы шлют подтверждение по два раза, и второй
   // обязан быть тихим успехом, иначе касса будет ретраить бесконечно. Право
