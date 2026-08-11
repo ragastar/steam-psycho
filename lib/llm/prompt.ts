@@ -118,18 +118,26 @@ export function getSystemPrompt(locale: string): string {
   return locale === "ru" ? SYSTEM_PROMPT_RU : SYSTEM_PROMPT_EN;
 }
 
+// Экономика в CARD DATA — либо единая рублёвая база (свежие профили,
+// economics.currency === "RUB"), либо старые вечные записи покупателей до
+// смены базы цен, где currency нет вовсе и число всё ещё в долларах.
+function formatMoney(amount: number, currency: AggregatedProfile["economics"]["currency"]): string {
+  return currency === "RUB" ? `${amount}₽` : `$${amount}`;
+}
+
 export function buildUserPrompt(
   profile: AggregatedProfile,
   cardStats: CardStats,
   rarity: Rarity,
 ): string {
+  const currency = profile.economics.currency;
   const topGamesStr = profile.topGames
     .map((g, i) => {
       const parts = [`${i + 1}. ${g.name} — ${g.playtimeHours}h`];
       if (g.vsAverage) parts.push(`(${g.vsAverage}x avg)`);
       if (g.isFree) parts.push("[F2P]");
       if (g.achievementRate !== undefined) parts.push(`achv:${g.achievementRate}%`);
-      if (g.pricePerHour !== undefined) parts.push(`$${g.pricePerHour}/h`);
+      if (g.pricePerHour !== undefined) parts.push(`${formatMoney(g.pricePerHour, currency)}/h`);
       parts.push(`[${g.tags.join(", ")}]`);
       parts.push(`(${g.genres.join(", ")})`);
       return parts.join(" ");
@@ -169,8 +177,8 @@ GENRE DISTRIBUTION: ${genresStr}
 TAG DISTRIBUTION: ${tagsStr}
 
 ECONOMICS:
-- Library value: $${profile.economics.totalLibraryValue}
-- Wasted (unplayed): $${profile.economics.wastedValue}
+- Library value: ${formatMoney(profile.economics.totalLibraryValue, currency)}
+- Wasted (unplayed): ${formatMoney(profile.economics.wastedValue, currency)}
 - Free games: ${profile.economics.freePercentage}%
 
 ACHIEVEMENTS:

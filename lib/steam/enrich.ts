@@ -3,7 +3,6 @@ import { cached } from "../cache/redis";
 import { getGamePrice } from "@/lib/wealth/store-price";
 
 const STEAMSPY_BASE = "https://steamspy.com/api.php";
-const STORE_BASE = "https://store.steampowered.com/api";
 const DELAY_MS = 300;
 
 /**
@@ -35,30 +34,6 @@ async function fetchSteamSpyAppData(appId: number): Promise<SteamSpyAppData | nu
   });
 }
 
-interface StoreEnrichResult {
-  genres: string[];
-}
-
-// Цену этот запрос больше не отдаёт — она приходит из getGamePrice
-// (единая рублёвая база). Здесь только жанры, поэтому регион не важен.
-async function fetchStoreData(appId: number): Promise<StoreEnrichResult> {
-  return cached(`steam:store:${appId}`, 7 * 24 * 3600, async () => {
-    try {
-      const res = await fetch(`${STORE_BASE}/appdetails?appids=${appId}&l=english`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!res.ok) return { genres: [] };
-      const data = await res.json();
-      const appData = data[String(appId)];
-      if (!appData?.success) return { genres: [] };
-      const genres = appData.data?.genres?.map((g: { description: string }) => g.description) || [];
-      return { genres };
-    } catch {
-      return { genres: [] };
-    }
-  });
-}
-
 export async function enrichGames(
   games: OwnedGame[],
   topN: number = 30,
@@ -75,16 +50,17 @@ export async function enrichGames(
     const batch = topGames.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(
       batch.map(async (game) => {
-        const [spyData, storeData, price] = await Promise.all([
+        // Жанры и цена — из одного и того же похода в магазин (getGamePrice
+        // отдаёт их вместе), отдельный запрос за жанрами не нужен.
+        const [spyData, price] = await Promise.all([
           fetchSteamSpyAppData(game.appid),
-          fetchStoreData(game.appid),
           getGamePrice(game.appid),
         ]);
         const tags = spyData?.tags || {};
         return {
           ...game,
           tags,
-          genres: storeData.genres,
+          genres: price.genres,
           price: price.rub,
           isFree: price.isFree,
           priceSource: price.source,

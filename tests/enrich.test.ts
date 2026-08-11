@@ -29,10 +29,13 @@ describe("потолок обогащения (MON-7)", () => {
     // Все игры остаются в выдаче — статистика по количеству не врёт.
     expect(result).toHaveLength(5000);
 
-    // Но запросов наружу — единицы сотен, а не 5000+. Порог выше, чем был:
-    // единая база цен спрашивает getGamePrice (до двух запросов — ru и us)
-    // и для игр сверх топ-N, а не только парсит уже загруженный SteamSpy.
-    expect(fetchSpy.mock.calls.length).toBeLessThan(1000);
+    // Но запросов наружу — единицы сотен, а не 5000+. Порог ниже, чем был
+    // сразу после смены базы цен (там было < 1000): жанры топ-игр больше не
+    // ходят в магазин отдельным запросом (fetchStoreData убран) — они едут в
+    // том же ответе, что и цена. На 300 обогащаемых играх (30 топ + 270
+    // остальных, по SteamSpy(1) + getGamePrice ru/us(2) = 3 запроса на игру
+    // без своей цены в моке) фактическое число — 900.
+    expect(fetchSpy.mock.calls.length).toBeLessThan(950);
   }, 120_000);
 
   it("игры сверх потолка попадают в результат без тегов и жанров", async () => {
@@ -42,5 +45,14 @@ describe("потолок обогащения (MON-7)", () => {
     const tail = result[result.length - 1];
     expect(tail.tags).toEqual({});
     expect(tail.genres).toEqual([]);
+  }, 120_000);
+
+  it("не ходит в магазин за жанрами отдельно от цены — жанры едут вместе с getGamePrice", async () => {
+    const { enrichGames } = await import("@/lib/steam/enrich");
+    await enrichGames(library(1), 1);
+
+    // Одна топ-игра: SteamSpy (1) + getGamePrice — ru и us, цены в моке нет
+    // ни там, ни там (2). Итого 3, а не 4 — отдельного похода за жанрами нет.
+    expect(fetchSpy.mock.calls.length).toBe(3);
   }, 120_000);
 });
