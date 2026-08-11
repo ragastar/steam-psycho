@@ -115,6 +115,10 @@ export function registerHandlers() {
 export async function handleLoginStart(userId: number, token: string): Promise<"ok" | "expired"> {
   const data = await getCache<{ status: string }>(loginTokenKey(token));
   if (!data) return "expired";
+  // Подтверждаем токен ровно один раз. Иначе последний нажавший Start
+  // перезаписывает предыдущего — и заодно продлевает срок жизни токена, —
+  // то есть чужое подтверждение можно перебить своим.
+  if (data.status === "confirmed") return "expired";
   await setCache(loginTokenKey(token), { status: "confirmed", telegramUserId: String(userId) }, 600);
   return "ok";
 }
