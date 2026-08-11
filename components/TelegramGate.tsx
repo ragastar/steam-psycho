@@ -37,7 +37,11 @@ export function TelegramGate({ steamId64, locale, children, onUnlock, accessGran
 
   const lsKey = `${LS_PREFIX}${steamId64}`;
 
-  const createToken = useCallback(async (retries = 2): Promise<string | null> => {
+  // Рекурсия по имени `createTokenImpl` (именованное функциональное выражение), а не по
+  // внешней const createToken: на момент вызова внутри самой себя внешняя const ещё не
+  // объявлена с точки зрения статического анализа (TDZ), тогда как собственное имя функции
+  // доступно ей с самого начала.
+  const createToken = useCallback(async function createTokenImpl(retries = 2): Promise<string | null> {
     try {
       const res = await fetch("/api/gate/create", {
         method: "POST",
@@ -47,7 +51,7 @@ export function TelegramGate({ steamId64, locale, children, onUnlock, accessGran
       if (!res.ok) {
         if (retries > 0) {
           await new Promise((r) => setTimeout(r, 2000));
-          return createToken(retries - 1);
+          return createTokenImpl(retries - 1);
         }
         return null;
       }
@@ -59,7 +63,7 @@ export function TelegramGate({ steamId64, locale, children, onUnlock, accessGran
     } catch {
       if (retries > 0) {
         await new Promise((r) => setTimeout(r, 2000));
-        return createToken(retries - 1);
+        return createTokenImpl(retries - 1);
       }
       return null;
     }

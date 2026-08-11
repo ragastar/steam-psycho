@@ -99,6 +99,10 @@ export function TeaserPage({ profile, steamId64, locale, rarity, accessGranted =
   // вызовом. startedRef внутри triggerGeneration страхует от повтора, в том
   // числе от двойного прогона эффектов в строгом режиме разработки.
   useEffect(() => {
+    // Каскадный рендер тут — не побочный эффект, а сама цель: увидев открытый
+    // доступ, сразу показываем крутилку и уходим в сеть за генерацией, вместо
+    // лишнего кадра с витриной.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (accessGranted) triggerGeneration();
   }, [accessGranted, triggerGeneration]);
 

@@ -29,17 +29,26 @@ export function ErrorDisplay({ code, onRetry }: ErrorDisplayProps) {
     code === "STEAM_UNAVAILABLE" ? 30 : null,
   );
 
+  // Один эффект вместо двух: тик таймера сам решает, что делать дальше — либо
+  // уменьшить счётчик, либо, если досчитали до конца, вызвать onRetry и начать
+  // заново. setState всегда вызывается внутри callback'а таймера, а не прямо в
+  // теле эффекта, поэтому каскадного синхронного рендера здесь нет.
   useEffect(() => {
     if (retryCountdown === null || retryCountdown <= 0) return;
-    const timer = setTimeout(() => setRetryCountdown(retryCountdown - 1), 1000);
+    const timer = setTimeout(() => {
+      if (retryCountdown === 1) {
+        if (onRetry) {
+          onRetry();
+          setRetryCountdown(30);
+        } else {
+          // onRetry не передан — просто замираем на нуле, как и раньше.
+          setRetryCountdown(0);
+        }
+      } else {
+        setRetryCountdown(retryCountdown - 1);
+      }
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [retryCountdown]);
-
-  useEffect(() => {
-    if (retryCountdown === 0 && onRetry) {
-      onRetry();
-      setRetryCountdown(30);
-    }
   }, [retryCountdown, onRetry]);
 
   const title = t(`${key}.title`);

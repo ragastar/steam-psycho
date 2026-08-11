@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { createHmac } from "crypto";
 import { issueAccessCookie, verifyAccessValue } from "@/lib/access/entitlement";
 
 const STEAM_ID = "76561198000000001";
@@ -28,9 +29,7 @@ describe("подписанный доступ (MON-1, MON-2)", () => {
   it("отвергает просроченную куку, даже с верной подписью", () => {
     // Подпись валидна для этой пары, но срок в прошлом.
     const past = Math.floor(Date.now() / 1000) - 10;
-    const crypto = require("crypto");
-    const sig = crypto
-      .createHmac("sha256", process.env.ACCESS_SECRET)
+    const sig = createHmac("sha256", process.env.ACCESS_SECRET!)
       .update(`${STEAM_ID}:${past}`)
       .digest("hex");
     expect(verifyAccessValue(STEAM_ID, `${past}.${sig}`)).toBe(false);

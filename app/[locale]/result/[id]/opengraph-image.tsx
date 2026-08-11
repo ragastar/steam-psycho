@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element, jsx-a11y/alt-text */
 import { ImageResponse } from "next/og";
 import { getCache } from "@/lib/cache/redis";
 import { portraitKey, profileKey } from "@/lib/cache/keys";
@@ -21,7 +20,6 @@ function getTopStats(stats: CardPortrait["stats"]): { key: string; value: number
 
 // Strip emoji to avoid Satori crashes (no emoji font loaded)
 function stripEmoji(str: string): string {
-  // eslint-disable-next-line no-control-regex
   return str.replace(/[^\x00-\x7F\u00A0-\u024F\u0400-\u04FF\u2000-\u206F\u2070-\u209F\u20A0-\u20CF\u2100-\u214F]/g, "").trim();
 }
 

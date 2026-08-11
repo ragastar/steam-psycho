@@ -79,6 +79,9 @@ export function LoginPanel({ onSignedIn }: Props) {
         >
           {t("auth.viaTelegram")}
         </a>
+        {/* Это не страница, а серверный маршрут, отвечающий редиректом на Steam;
+            next/link дал бы клиентский переход и сломал бы редирект. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href="/api/auth/steam/start"
           className="px-5 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold transition-colors"
