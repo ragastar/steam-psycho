@@ -4,6 +4,7 @@ import { Resvg } from "@resvg/resvg-js";
 import type { CardPortrait } from "../llm/types";
 import type { AggregatedProfile } from "../aggregation/types";
 import { getRarityTheme } from "./styles";
+import { toFreePortrait } from "../access/redact-portrait";
 import { SITE_HOST } from "../site";
 
 let fontData: ArrayBuffer | null = null;
@@ -31,7 +32,12 @@ export async function renderCardPng(
 ): Promise<Buffer> {
   const theme = getRarityTheme(portrait.rarity);
   const font = await getFont();
-  const firstRoast = portrait.roasts[0];
+  // Картинку карточки отдаёт /api/og/[id] — по одной ссылке, кому угодно, без
+  // входа и без проверки права. Значит нарисовано в ней может быть только
+  // бесплатное. Первый роаст в карточке платный через раз; бесплатный ровно
+  // один — самый суровый. Его может не быть вовсе (битая карточка из кеша),
+  // поэтому ниже блок рисуется под условием.
+  const freeRoast = toFreePortrait(portrait).roasts[0];
   const topStats = getTopStats(portrait.stats);
 
   const svg = await satori(
@@ -106,7 +112,7 @@ export async function renderCardPng(
 
       {/* Roast */}
       <div style={{ display: "flex", flexDirection: "column", marginTop: "8px" }}>
-        {firstRoast && (
+        {freeRoast && (
           <div
             style={{
               display: "flex",
@@ -118,8 +124,8 @@ export async function renderCardPng(
               borderLeft: `4px solid ${theme.accentColor}`,
             }}
           >
-            <span style={{ fontSize: "24px" }}>{firstRoast.icon}</span>
-            <span style={{ fontSize: "16px", color: "#ccc" }}>{firstRoast.text}</span>
+            <span style={{ fontSize: "24px" }}>{freeRoast.icon}</span>
+            <span style={{ fontSize: "16px", color: "#ccc" }}>{freeRoast.text}</span>
           </div>
         )}
       </div>
