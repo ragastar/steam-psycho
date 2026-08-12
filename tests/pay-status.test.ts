@@ -174,6 +174,16 @@ async function payThroughStub(
   return { prepared, hook };
 }
 
+/** Ждёт условия, а не времени: генерация ушла в фон и кончится когда кончится. */
+async function waitFor(check: () => boolean, limitMs = 2000): Promise<void> {
+  const deadline = Date.now() + limitMs;
+  while (Date.now() < deadline) {
+    if (check()) return;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  throw new Error("не дождались");
+}
+
 describe("статус заказа для страницы возврата", () => {
   it("только что созданный заказ — created", async () => {
     const world = await freshWorld({ dbPath });
@@ -429,6 +439,8 @@ describe("купленное хранится долго, а не сутки", (
     );
 
     expect(res.status).toBe(200);
+    // Генерация ушла в фон: маршрут отвечает раньше, чем карточка написана.
+    await waitFor(() => cacheState.has(world.keys.portraitKey(STEAM_ID, "ru")));
     const long = world.keys.CACHE_TTL.purchased;
     expect(cacheState.get(world.keys.portraitKey(STEAM_ID, "ru"))!.ttl).toBe(long);
     // Спутники карточки проверяются отдельно, и это не придирка: портрет кладут
@@ -456,6 +468,7 @@ describe("купленное хранится долго, а не сутки", (
     );
 
     expect(res.status).toBe(200);
+    await waitFor(() => cacheState.has(world.keys.portraitKey(STEAM_ID, "ru")));
     expect(cacheState.get(world.keys.portraitKey(STEAM_ID, "ru"))!.ttl).toBe(
       world.keys.CACHE_TTL.portrait,
     );

@@ -32,6 +32,9 @@ vi.mock("@/lib/cache/redis", () => ({
   setCache: async (key: string, value: unknown) => {
     written.set(key, value);
   },
+  deleteCache: async (key: string) => {
+    written.delete(key);
+  },
   incrementRateLimit: async () => 1,
 }));
 
@@ -94,6 +97,16 @@ function createRequest(): Request {
   });
 }
 
+/** Ждёт условия, а не времени: фоновая работа заканчивается когда закончится. */
+async function waitFor(check: () => boolean, limitMs = 2000): Promise<void> {
+  const deadline = Date.now() + limitMs;
+  while (Date.now() < deadline) {
+    if (check()) return;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  throw new Error("не дождались");
+}
+
 describe("генерация карточки при включённой кассе", () => {
   it("касса stub, входа нет — генерирует, а не отвечает 403", async () => {
     const { POST } = await import("@/app/api/generate/route");
@@ -103,9 +116,10 @@ describe("генерация карточки при включённой кас
 
     expect(res.status).toBe(200);
     expect(body.code).not.toBe("ACCESS_REQUIRED");
+    // Генерация идёт в фоне, поэтому ждём её, а не проверяем сразу: маршрут
+    // отвечает раньше, чем модель начала писать.
+    await waitFor(() => written.has(portraitKey(STEAM_ID, "ru")));
     expect(generatePortrait).toHaveBeenCalledTimes(1);
-    // Карточка легла в кеш — со страницы её достанет ветка бесплатного вида.
-    expect(written.has(portraitKey(STEAM_ID, "ru"))).toBe(true);
   });
 
   it("а вот данных разбора нет — по-прежнему DATA_EXPIRED, а не генерация", async () => {

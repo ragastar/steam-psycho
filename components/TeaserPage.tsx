@@ -41,6 +41,9 @@ const FEATURES = [
   { icon: "\uD83D\uDCCA", key: "feature5" },
 ] as const;
 
+const POLL_EVERY_MS = 3000;
+const POLL_LIMIT_MS = 5 * 60 * 1000;
+
 export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPageProps) {
   const t = useTranslations();
   const router = useRouter();
@@ -49,6 +52,8 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
   // Повтор помогает при отказе ИИ, но при протухших данных Steam он зациклит
   // посетителя на одном и том же отказе — там нужен новый разбор аккаунта.
   const [failure, setFailure] = useState<"" | "retryable" | "expired">("");
+  // Как часто спрашиваем «готово?» и сколько всего ждём. Пять минут — заведомо
+  // больше самой долгой замеренной генерации (120 секунд).
   // Одна генерация на монтирование: каждый лишний вызов — это платный запрос.
   const startedRef = useRef(false);
 
@@ -70,8 +75,39 @@ export function TeaserPage({ profile, steamId64, locale, rarity }: TeaserPagePro
         startedRef.current = false; // Дать повторить после ошибки.
         return;
       }
-      // Portrait generated — reload page to show full result
-      router.refresh();
+
+      // Карточка пишется в фоне, а не за время этого запроса: держать
+      // соединение открытым 85-120 секунд нельзя — nginx рвёт его на 180, и
+      // никакого запаса на переспрос при этом не остаётся. Поэтому спрашиваем
+      // состояние, пока не станет готово.
+      const deadline = Date.now() + POLL_LIMIT_MS;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_EVERY_MS));
+
+        const state = await fetch(
+          `/api/generate?steamId64=${encodeURIComponent(steamId64)}&locale=${encodeURIComponent(locale)}`,
+        )
+          .then((r) => r.json())
+          .catch(() => null);
+
+        if (state?.status === "ready") {
+          router.refresh();
+          return;
+        }
+        if (state?.status === "failed") {
+          setFailure("retryable");
+          setGenerating(false);
+          startedRef.current = false;
+          return;
+        }
+        // `idle` тоже ждём: замок мог не успеть появиться к первому опросу.
+      }
+
+      // Время вышло. Карточка могла всё же дописаться позже — обновление
+      // страницы это покажет, поэтому отказ помечен повторяемым.
+      setFailure("retryable");
+      setGenerating(false);
+      startedRef.current = false;
     } catch {
       setFailure("retryable");
       setGenerating(false);

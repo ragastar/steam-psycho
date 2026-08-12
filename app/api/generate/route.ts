@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { generatePortrait } from "@/lib/llm/client";
 import { applyComputedFacts } from "@/lib/llm/facts";
-import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
+import { getCache, setCache, deleteCache, incrementRateLimit } from "@/lib/cache/redis";
 import { persistPurchased } from "@/lib/cache/purchased";
 import { steamIdHasEntitlement } from "@/lib/billing/store";
 import { paywallMode } from "@/lib/access/entitlement";
@@ -77,6 +77,102 @@ export async function POST(req: Request) {
       );
     }
 
+    // Генерация уходит в фон, а ответ отдаётся сразу.
+    //
+    // Держать соединение открытым было нельзя: карточка пишется 85-120 секунд
+    // при потолке попытки 160 и общем сроке 165, переспрос при неразобранном
+    // ответе требует запаса в сто секунд — то есть запасной попытки фактически
+    // не существовало, и любая осечка модели превращалась в отказ человеку.
+    // Плюс nginx рвёт соединение на 180 секундах, а платный ключ в этот срок
+    // не влезал бы вовсе.
+    //
+    // Замок не даёт запустить вторую генерацию того же человека: каждая стоит
+    // денег. Живёт пять минут — дольше генерация не длится ни при каких сроках,
+    // и зависший замок сам отпустит.
+    if (await getCache(genLockKey(steamId64, locale))) {
+      return NextResponse.json({ status: "pending" });
+    }
+    await setCache(genLockKey(steamId64, locale), true, GEN_LOCK_TTL);
+    await deleteCache(genFailKey(steamId64, locale));
+
+    // Намеренно без await: процесс живёт дальше ответа (это долгоживущий
+    // сервер, а не разовая функция), и результат подхватит опрос состояния.
+    void runGeneration({ steamId64, locale, profile, cardStats, rarity, ipHash }).catch((err) => {
+      console.error("[generate] фоновая генерация упала:", err);
+    });
+
+    return NextResponse.json({ status: "pending" });
+  } catch (err) {
+    console.error("[generate] error:", err);
+    logError({
+      type: "GENERATE_ERROR",
+      message: err instanceof Error ? err.message : "Unknown",
+      ipHash: hashIp(ip),
+      endpoint: "/api/generate",
+    });
+    return NextResponse.json(
+      { error: true, code: "GENERATE_ERROR", message: "Portrait generation failed" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Состояние генерации. Опрашивается страницей ожидания.
+ *
+ * `idle` — никто не начинал; `pending` — идёт; `ready` — карточка готова;
+ * `failed` — не получилось, и повторить можно.
+ */
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const steamId64 = url.searchParams.get("steamId64") || "";
+  const locale = url.searchParams.get("locale") || "ru";
+
+  if (!/^\d{17}$/.test(steamId64)) {
+    return NextResponse.json({ error: true, code: "INVALID_INPUT" }, { status: 400 });
+  }
+
+  if (await getCache(portraitKey(steamId64, locale))) {
+    return NextResponse.json({ status: "ready" });
+  }
+
+  const failure = await getCache<{ code: string }>(genFailKey(steamId64, locale));
+  if (failure) return NextResponse.json({ status: "failed", code: failure.code });
+
+  if (await getCache(genLockKey(steamId64, locale))) {
+    return NextResponse.json({ status: "pending" });
+  }
+
+  return NextResponse.json({ status: "idle" });
+}
+
+/** Замок и след отказа. В SQLite не уезжают: оба живут минутами. */
+const GEN_LOCK_TTL = 300;
+const GEN_FAIL_TTL = 120;
+
+function genLockKey(steamId64: string, locale: string): string {
+  return `genlock:v1:${steamId64}:${locale}`;
+}
+
+function genFailKey(steamId64: string, locale: string): string {
+  return `genfail:v1:${steamId64}:${locale}`;
+}
+
+/**
+ * Сама генерация. Работает уже после того, как ответ ушёл человеку, поэтому
+ * обязана убрать за собой замок в любом исходе — иначе следующая попытка
+ * упрётся в него на пять минут.
+ */
+async function runGeneration(args: {
+  steamId64: string;
+  locale: string;
+  profile: AggregatedProfile;
+  cardStats: CardStats;
+  rarity: Rarity;
+  ipHash: string;
+}): Promise<void> {
+  const { steamId64, locale, profile, cardStats, rarity, ipHash } = args;
+  try {
     // 3. Generate portrait via LLM
     //
     // Личность карточки (класс существа, стихия, свет) читается ДО генерации:
@@ -135,19 +231,21 @@ export async function POST(req: Request) {
       // Пишем то, что реально отработало, а не значение из настроек.
       llmProvider: `${generated.provider}/${generated.model}`,
     });
-
-    return NextResponse.json({ status: "generated" });
   } catch (err) {
-    console.error("[generate] error:", err);
+    console.error("[generate] генерация не удалась:", err);
     logError({
       type: "GENERATE_ERROR",
       message: err instanceof Error ? err.message : "Unknown",
-      ipHash: hashIp(ip),
+      ipHash,
       endpoint: "/api/generate",
     });
-    return NextResponse.json(
-      { error: true, code: "GENERATE_ERROR", message: "Portrait generation failed" },
-      { status: 500 },
-    );
+    // Замок снимается ПЕРЕД тем, как выставить след отказа. Иначе опрос видит
+    // «не получилось» раньше, чем можно повторить, и кнопка «попробовать ещё»
+    // упирается в замок, которого человек не видит.
+    await deleteCache(genLockKey(steamId64, locale));
+    await setCache(genFailKey(steamId64, locale), { code: "GENERATE_ERROR" }, GEN_FAIL_TTL);
+  } finally {
+    // Подстраховка на случай неожиданного выхода: снимать дважды безвредно.
+    await deleteCache(genLockKey(steamId64, locale));
   }
 }
