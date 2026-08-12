@@ -1,4 +1,5 @@
 import { MIN_SAMPLE_FOR_REAL_PERCENTILES } from "../aggregation/percentile";
+import { strengthOf } from "../aggregation/aggregate";
 import { getDb } from "./db";
 
 type Row = Record<string, unknown>;
@@ -223,6 +224,30 @@ export function getTableCounts() {
 }
 
 // === Перцентили по собственной статистике (DATA-3) ===
+
+/**
+ * Сила профиля каждого, кто уже прошёл разбор, — по одному значению на человека.
+ *
+ * Схлопывание по Steam ID обязательно: в таблице 29 строк, но людей за ними
+ * восемь, и один переразбирался семь раз. Без схлопывания он весил бы в
+ * перцентиле всемеро и сдвигал бы редкость всем остальным.
+ *
+ * null — выборки ещё мало, чтобы место в ней что-то значило.
+ */
+export function getRaritySample(): number[] | null {
+  const rows = query<{ id: string; h: number | null; l: number | null; a: number | null }>(
+    `SELECT steam_id64 AS id, total_playtime_hours AS h, library_size AS l, account_age_years AS a
+     FROM analyses
+     WHERE cached = 0 AND total_playtime_hours IS NOT NULL
+     ORDER BY timestamp DESC`,
+  );
+
+  const latestPerPerson = new Map<string, { h: number | null; l: number | null; a: number | null }>();
+  for (const row of rows) if (!latestPerPerson.has(row.id)) latestPerPerson.set(row.id, row);
+
+  if (latestPerPerson.size < MIN_SAMPLE_FOR_REAL_PERCENTILES) return null;
+  return [...latestPerPerson.values()].map((r) => strengthOf(r.h, r.l, r.a));
+}
 
 /**
  * Отдаёт накопленные значения для расчёта настоящих перцентилей.

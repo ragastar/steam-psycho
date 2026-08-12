@@ -26,7 +26,7 @@ describe("подпись валюты в пользовательском про
     expect(profile.economics.currency).toBe("RUB");
 
     const stats = calculateCardStats(profile);
-    const rarity = calculateRarity(profile);
+    const rarity = calculateRarity(profile, null);
     const prompt = buildUserPrompt(profile, stats, rarity);
 
     expect(prompt).toContain(`${profile.economics.totalLibraryValue}₽`);
@@ -42,7 +42,7 @@ describe("подпись валюты в пользовательском про
     const legacyProfile = { ...profile, economics: { ...profile.economics, currency: undefined } };
 
     const stats = calculateCardStats(legacyProfile);
-    const rarity = calculateRarity(legacyProfile);
+    const rarity = calculateRarity(legacyProfile, null);
     const prompt = buildUserPrompt(legacyProfile, stats, rarity);
 
     expect(prompt).toContain(`$${legacyProfile.economics.totalLibraryValue}`);

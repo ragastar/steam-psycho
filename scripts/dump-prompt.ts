@@ -67,7 +67,7 @@ async function main() {
   // Достижения пропускаем: они добавляют минуты, а на форму промпта влияют мало.
   const profile = buildAggregatedProfile(player, enriched, recent, level, friends, badges, []);
   const cardStats = calculateCardStats(profile);
-  const rarity = calculateRarity(profile);
+  const rarity = calculateRarity(profile, null);
 
   const systemPrompt = getSystemPrompt(locale);
   const userPrompt = buildUserPrompt(profile, cardStats, rarity);

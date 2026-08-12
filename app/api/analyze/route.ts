@@ -20,7 +20,7 @@ import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
 import { getClientIp } from "@/lib/http/client-ip";
-import { getPercentileSample } from "@/lib/analytics/queries";
+import { getPercentileSample, getRaritySample } from "@/lib/analytics/queries";
 import { percentileRank } from "@/lib/aggregation/percentile";
 
 const ERROR_CODES: Record<string, number> = {
@@ -190,7 +190,7 @@ export async function POST(req: Request) {
 
     // 7. Calculate card stats and rarity
     const cardStats = calculateCardStats(profile);
-    const rarity = calculateRarity(profile);
+    const rarity = calculateRarity(profile, getRaritySample());
 
     // 8. Select card identity (creature + element) algorithmically
     const cardIdentity = selectCardIdentity(profile, cardStats, steamId64);

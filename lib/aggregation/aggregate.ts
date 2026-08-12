@@ -1,6 +1,7 @@
 import type { SteamPlayer, OwnedGame, EnrichedGame, SteamFriend, BadgesResponse, AchievementGameData } from "../steam/types";
 import type { AggregatedProfile } from "./types";
 import type { Rarity } from "../llm/types";
+import { MIN_SAMPLE_FOR_REAL_PERCENTILES, percentileRank } from "./percentile";
 
 const MP_TAGS = new Set([
   "Multi-player", "Multiplayer", "Online Multi-Player",
@@ -386,17 +387,68 @@ export function calculateCardStats(profile: AggregatedProfile): CardStats {
 }
 
 // --- Rarity ---
-export function calculateRarity(profile: AggregatedProfile): Rarity {
-  const hours = profile.stats.totalPlaytimeHours;
-  const games = profile.stats.totalGames;
-  const level = profile.player.steamLevel;
 
-  const score = hours * 0.4 + games * 0.3 + level * 0.3;
+/**
+ * Сила профиля от 0 до 1.
+ *
+ * Логарифм, а не доля от потолка: на нашей аудитории линейная мера упиралась
+ * в потолок почти у всех и на 29 разборах давала семь различимых значений.
+ * Уровень Steam в счёт не входит намеренно — часы, размер библиотеки и возраст
+ * аккаунта лежат в таблице разборов, а уровень нет, и без него ту же величину
+ * можно посчитать по истории и сравнить человека с остальными.
+ */
+export function profileStrength(profile: AggregatedProfile): number {
+  return strengthOf(
+    profile.stats.totalPlaytimeHours,
+    profile.stats.totalGames,
+    profile.timeline?.accountAge,
+  );
+}
 
-  if (score >= 1000) return "legendary";
-  if (score >= 600) return "epic";
-  if (score >= 300) return "rare";
-  if (score >= 100) return "uncommon";
+/** Та же арифметика для сырых чисел из таблицы разборов. */
+export function strengthOf(hours?: number | null, games?: number | null, ageYears?: number | null): number {
+  const h = Math.min(Math.log1p(hours || 0) / Math.log1p(20000), 1);
+  const g = Math.min(Math.log1p(games || 0) / Math.log1p(2000), 1);
+  const a = Math.min((ageYears || 0) / 20, 1);
+  return 0.5 * h + 0.3 * g + 0.2 * a;
+}
+
+/**
+ * Пороги на то время, пока своей выборки мало.
+ *
+ * Сняты НЕ с накопленных разборов: там восемь человек, все — владелец и его
+ * друзья с 4–37 тысячами часов, и калибровка по ним сделала бы легендаркой
+ * только тридцать семь тысяч. Ориентиры внешние: новичок (100 ч) — обычная,
+ * обычный игрок (500 ч) — необычная, активный (2000 ч) — редкая, задрот
+ * (6000 ч) — эпическая, хардкор (17000 ч и большая библиотека) — легендарная.
+ */
+const STRENGTH_THRESHOLDS: [number, Rarity][] = [
+  [0.85, "legendary"],
+  [0.72, "epic"],
+  [0.60, "rare"],
+  [0.45, "uncommon"],
+];
+
+/**
+ * Редкость — место в выборке, а не сумма часов.
+ *
+ * Прежняя формула (`часы×0.4 + игры×0.3 + уровень×0.3`, легендарка с 1000)
+ * выдавала легендарку любому с 2500 часами: легендарными оказались 27 карточек
+ * из 27, и у всех была одна и та же золотая рамка.
+ */
+export function calculateRarity(profile: AggregatedProfile, sample: number[] | null): Rarity {
+  const strength = profileStrength(profile);
+
+  if (sample && sample.length >= MIN_SAMPLE_FOR_REAL_PERCENTILES) {
+    const rank = percentileRank(sample, strength);
+    if (rank >= 95) return "legendary";
+    if (rank >= 80) return "epic";
+    if (rank >= 50) return "rare";
+    if (rank >= 20) return "uncommon";
+    return "common";
+  }
+
+  for (const [threshold, rarity] of STRENGTH_THRESHOLDS) if (strength >= threshold) return rarity;
   return "common";
 }
 
