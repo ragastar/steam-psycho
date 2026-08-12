@@ -5,7 +5,7 @@ import type { CardStats } from "@/lib/aggregation/aggregate";
 
 /** Человек ровно средний по всем чертам, кроме заданных. */
 function statsOf(overrides: Partial<CardStats> = {}): CardStats {
-  return { dedication: 86, mastery: 67, exploration: 56, hoarding: 34, social: 47, veteran: 66, ...overrides };
+  return { dedication: 84, mastery: 63, exploration: 60, hoarding: 40, social: 53, veteran: 70, ...overrides };
 }
 
 function profileOf(
@@ -20,20 +20,27 @@ function profileOf(
 
 describe("выбор класса существа", () => {
   it("берёт самую выделяющуюся черту, а не самую высокую", () => {
-    // Упорство 86 — среднее по всем, кто дошёл до разбора: оно не отличает
-    // никого ни от кого. Барахольство 80 при типичных 34 отличает сильно.
-    expect(mostDistinctiveTrait(statsOf({ hoarding: 80 }))).toBe("hoarding");
+    // Упорство 84 — середина по всем, кто дошёл до разбора: оно не отличает
+    // никого ни от кого. Барахольство 90 при середине 40 отличает сильно.
+    expect(mostDistinctiveTrait(statsOf({ hoarding: 90 }))).toBe("hoarding");
     // Провал по черте говорит о человеке столько же, сколько всплеск.
-    expect(mostDistinctiveTrait(statsOf({ hoarding: 5 }))).toBe("hoarding");
+    expect(mostDistinctiveTrait(statsOf({ hoarding: 0 }))).toBe("hoarding");
+  });
+
+  it("отклонение мерится в долях разброса самой черты, а не от её середины", () => {
+    // Упорство держится в узком коридоре, барахольство гуляет вдвое шире.
+    // Одна и та же разница в очках значит по ним разное: +14 к упорству —
+    // это два разброса, +14 к барахольству — меньше одного.
+    expect(mostDistinctiveTrait(statsOf({ dedication: 98, hoarding: 54 }))).toBe("dedication");
   });
 
   it("класс существа берётся из пула выделяющейся черты", () => {
-    const id = selectCardIdentity(profileOf(), statsOf({ hoarding: 80 }), "76561198000000001");
+    const id = selectCardIdentity(profileOf(), statsOf({ hoarding: 90 }), "76561198000000001");
     expect(["crustaceans", "insects", "mustelids"]).toContain(id.creatureClass);
   });
 
   it("двое с одинаковой выделяющейся чертой получают разные классы", () => {
-    const stats = statsOf({ hoarding: 80 });
+    const stats = statsOf({ hoarding: 90 });
     const classes = new Set(
       ["1", "2", "3", "4", "5"].map((n) => selectCardIdentity(profileOf(), stats, "7656119800000000" + n).creatureClass),
     );

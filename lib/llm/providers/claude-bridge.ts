@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { CardPortraitSchema } from "../types";
 import type { CardPortrait } from "../types";
 import { extractJSON } from "../json";
@@ -128,10 +129,22 @@ async function callBridge(
   return data;
 }
 
+/**
+ * Разбор ответа моста. Причина отказа пишется в журнал, а не проглатывается:
+ * без неё «ответ не разобран» — это тупик. По ней видно, что случилось на самом
+ * деле: обрыв на полуслове (кончилось время у дочернего claude), лишний текст
+ * вокруг JSON или несовпадение со схемой.
+ */
 function parsePortrait(text: string): CardPortrait | null {
   try {
     return CardPortraitSchema.parse(extractJSON(text));
-  } catch {
+  } catch (err) {
+    const issues = err instanceof ZodError
+      ? err.issues.slice(0, 5).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+      : String(err).slice(0, 200);
+    console.warn(
+      `[bridge] ответ не разобран: ${issues} | длина ${text.length}, хвост: ${JSON.stringify(text.slice(-160))}`,
+    );
     return null;
   }
 }
