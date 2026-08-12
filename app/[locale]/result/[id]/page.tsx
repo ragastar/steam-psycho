@@ -13,6 +13,7 @@ import { TeaserPage } from "@/components/TeaserPage";
 import { FreeResult } from "@/components/FreeResult";
 import { getAccessLevel } from "@/lib/access/entitlement";
 import { getWealth } from "@/lib/wealth/store";
+import { FeedbackBanner } from "@/components/FeedbackBanner";
 import type { Wealth } from "@/lib/wealth/types";
 import { toTeaserProfile } from "@/lib/access/redact";
 import { toFreePortrait } from "@/lib/access/redact-portrait";
@@ -152,14 +153,21 @@ export default async function ResultPage({ params: rawParams, searchParams }: Pr
     const loginOutcome = rawLogin === "taken" || rawLogin === "failed" ? rawLogin : null;
 
     return (
-      <FreeResult
-        free={toFreePortrait(portrait)}
-        profile={toTeaserProfile(profile)}
-        steamId64={params.id}
-        locale={params.locale}
-        isOwner={isOwner}
-        loginOutcome={loginOutcome}
-      />
+      <>
+        <FreeResult
+          free={toFreePortrait(portrait)}
+          profile={toTeaserProfile(profile)}
+          steamId64={params.id}
+          locale={params.locale}
+          isOwner={isOwner}
+          loginOutcome={loginOutcome}
+        />
+        {/* Обратная связь спрашивается и у тех, кто не платил: сказать
+            «шляпа не работает» должен мочь любой. */}
+        <div className="max-w-3xl mx-auto px-4 pb-8">
+          <FeedbackBanner steamId64={params.id} locale={params.locale} />
+        </div>
+      </>
     );
   }
 
@@ -204,6 +212,8 @@ export default async function ResultPage({ params: rawParams, searchParams }: Pr
             {t("result.challengeFriend")} — {t("result.inDevelopment")}
           </span>
         </div>
+
+        <FeedbackBanner steamId64={params.id} locale={params.locale} />
 
         <p className="text-center text-xs text-gray-700">{t("footer.disclaimer")}</p>
       </div>

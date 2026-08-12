@@ -71,6 +71,19 @@ function migrate(db: Database.Database) {
       timestamp INTEGER NOT NULL
     );
 
+    -- Обратная связь с сайта. Живёт в той же базе, что аналитика: читает её
+    -- админка, а заводить второй файл ради одной таблицы незачем.
+    CREATE TABLE IF NOT EXISTS feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      contact TEXT,
+      steam_id64 TEXT,
+      page TEXT,
+      ip_hash TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_feedback_timestamp ON feedback(timestamp);
     CREATE INDEX IF NOT EXISTS idx_analyses_timestamp ON analyses(timestamp);
     CREATE INDEX IF NOT EXISTS idx_analyses_steam_id64 ON analyses(steam_id64);
     CREATE INDEX IF NOT EXISTS idx_errors_timestamp ON errors(timestamp);
@@ -115,6 +128,38 @@ export function logAnalysis(data: {
     );
   } catch (err) {
     console.error("[analytics] logAnalysis failed:", err);
+  }
+}
+
+/** Ограничения на одно сообщение: длиннее в базу не кладём и обрезаем молча. */
+export const FEEDBACK_MAX_TEXT = 4000;
+export const FEEDBACK_MAX_CONTACT = 200;
+
+export function logFeedback(data: {
+  text: string;
+  contact?: string;
+  steamId64?: string;
+  page?: string;
+  ipHash?: string;
+}): boolean {
+  try {
+    const d = getDb();
+    if (!d) return false;
+    d.prepare(`
+      INSERT INTO feedback (timestamp, text, contact, steam_id64, page, ip_hash)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      Date.now(),
+      data.text.slice(0, FEEDBACK_MAX_TEXT),
+      data.contact?.slice(0, FEEDBACK_MAX_CONTACT) || null,
+      data.steamId64 || null,
+      data.page || null,
+      data.ipHash || null,
+    );
+    return true;
+  } catch (err) {
+    console.error("[analytics] logFeedback failed:", err);
+    return false;
   }
 }
 

@@ -276,3 +276,25 @@ export function getPercentileSample(): {
     accountAge: rows.map((r) => r.a).filter((v): v is number => v !== null),
   };
 }
+
+// === Обратная связь ===
+
+export interface FeedbackRow {
+  id: number;
+  timestamp: number;
+  text: string;
+  contact: string | null;
+  steam_id64: string | null;
+  page: string | null;
+}
+
+export function getRecentFeedback(limit = 200): FeedbackRow[] {
+  return query<FeedbackRow>(
+    "SELECT id, timestamp, text, contact, steam_id64, page FROM feedback ORDER BY timestamp DESC LIMIT ?",
+    [limit],
+  );
+}
+
+export function getFeedbackCount(): number {
+  return queryOne<{ n: number }>("SELECT COUNT(*) AS n FROM feedback")?.n ?? 0;
+}

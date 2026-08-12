@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/admin/traffic", label: "Трафик", icon: "📈" },
   { href: "/admin/users", label: "Пользователи", icon: "👤" },
   { href: "/admin/costs", label: "Расходы", icon: "💰" },
+  { href: "/admin/feedback", label: "Обратная связь", icon: "💬" },
   { href: "/admin/telegram", label: "Telegram", icon: "📱" },
   { href: "/admin/system", label: "Система", icon: "⚙️" },
 ];
