@@ -95,9 +95,22 @@ function sqliteSet(key: string, value: unknown, ttlSeconds: number): void {
  * каждый push в master) стирал разобранные профили: все, кто в этот момент ждал
  * результат, получали «данные устарели, начните заново».
  */
-const PERSISTENT_PREFIXES = ["gate:", "profile:", "cardstats:", "rarity:", "portrait:", "art:identity:", "wealth:"];
+/**
+ * Цены и курс попали сюда 2026-08-12. Они не про конкретного человека, но
+ * добываются дорого: разбор библиотеки укладывается в бюджет 60 новых походов
+ * в магазин Steam, а магазин режет по частоте. Пока цены жили только в памяти,
+ * каждая пересборка образа обнуляла их, и у аккаунта со 157 играми настоящую
+ * цену получали 68, а 67 достраивались средней.
+ *
+ * Прайс-лист рынка (market:) сюда сознательно НЕ входит: это один большой
+ * список на игру, ради которого хватает одного похода в сутки.
+ */
+export const PERSISTENT_PREFIXES = [
+  "gate:", "profile:", "cardstats:", "rarity:", "portrait:", "art:identity:", "wealth:",
+  "gameprice:", "storeprice:", "fx:",
+];
 
-function isPersistentKey(key: string): boolean {
+export function isPersistentKey(key: string): boolean {
   return PERSISTENT_PREFIXES.some((p) => key.startsWith(p));
 }
 
