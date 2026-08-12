@@ -15,6 +15,7 @@ interface Labels {
   marketNote: string;
   estimatedNote: string;
   privateInventory: string;
+  inventoryUnavailable: string;
   storeNote: string;
 }
 
@@ -79,6 +80,11 @@ export function WealthCard({ wealth, labels }: { wealth: Wealth; labels: Labels 
         <div>{labels.storeNote}</div>
         {wealth.inventory.status === "private" ? (
           <div>{labels.privateInventory}</div>
+        ) : wealth.inventory.status === "unavailable" ? (
+          // Steam не ответил / лимит / оборвалась связь — это не приватность
+          // и не оценка по рынку. Число рядом уже честно показывает прочерк,
+          // подпись не должна утверждать, что оценка была.
+          <div>{labels.inventoryUnavailable}</div>
         ) : (
           <div>{labels.marketNote}</div>
         )}

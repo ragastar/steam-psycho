@@ -94,6 +94,7 @@
       "marketNote": "Inventory is valued at quick-sale prices on a third-party market; inside Steam these items cost about a quarter more",
       "estimatedNote": "Part of the total is estimated from the average price",
       "privateInventory": "Inventory is private",
+      "inventoryUnavailable": "Couldn't fetch the inventory — Steam didn't respond, we'll try again later",
       "storeNote": "Steam prices for Russia, today"
     },
     "economics": {
