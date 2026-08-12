@@ -5,8 +5,8 @@ import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { persistPurchased } from "@/lib/cache/purchased";
 import { steamIdHasEntitlement } from "@/lib/billing/store";
 import { paywallMode } from "@/lib/access/entitlement";
-import { CACHE_TTL, portraitKey, profileKey, cardStatsKey, rarityKey, rateLimitKey, artIdentityKey } from "@/lib/cache/keys";
-import { selectCardIdentity, type CardIdentity } from "@/lib/art/card-identity";
+import { CACHE_TTL, portraitKey, profileKey, cardStatsKey, rarityKey, rateLimitKey } from "@/lib/cache/keys";
+import { ensureCardIdentity } from "@/lib/art/identity-store";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -84,8 +84,7 @@ export async function POST(req: Request) {
     // сваливается в свой самый вероятный образ — из пятнадцати духов восемь
     // выходили грызунами. Раньше эта строка стояла ПОСЛЕ генерации и служила
     // только аналитике.
-    const cardIdentity = await getCache<CardIdentity>(artIdentityKey(steamId64))
-      || selectCardIdentity(profile, cardStats, steamId64);
+    const cardIdentity = await ensureCardIdentity(profile, cardStats, steamId64);
 
     const t0 = Date.now();
     const generated = await generatePortrait(profile, cardStats, rarity, cardIdentity, locale);

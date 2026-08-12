@@ -1,4 +1,4 @@
-import { CACHE_TTL, cardStatsKey, portraitKey, profileKey, rarityKey } from "./keys";
+import { CACHE_TTL, artIdentityKey, cardStatsKey, portraitKey, profileKey, rarityKey } from "./keys";
 import { getCache, setCache } from "./redis";
 
 /**
@@ -31,6 +31,9 @@ export async function persistPurchased(steamId64: string): Promise<void> {
     profileKey(steamId64),
     cardStatsKey(steamId64),
     rarityKey(steamId64),
+    // Личность карточки (класс существа, стихия, свет): без неё художник у
+    // покупателя через сутки взял бы значения по умолчанию.
+    artIdentityKey(steamId64),
     ...LOCALES.map((locale) => portraitKey(steamId64, locale)),
   ];
 
