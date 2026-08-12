@@ -48,6 +48,7 @@ const labels = {
   privateInventory: "PRIVATE_MARKER",
   inventoryUnavailable: "UNAVAILABLE_MARKER",
   storeNote: "SN",
+  libraryPending: "LIBRARY_PENDING_MARKER",
 };
 
 describe("витрина кошелька", () => {
@@ -74,7 +75,7 @@ describe("витрина кошелька", () => {
       const wealth = (messages as Record<string, Record<string, unknown>>).deepDive.wealth as Record<string, string>;
       for (const key of ["title", "library", "inventory", "unplayed", "perHour", "avgPrice",
                          "marketNote", "estimatedNote", "privateInventory", "cards",
-                         "unpricedCount", "unpricedNote", "inventoryUnavailable"]) {
+                         "unpricedCount", "unpricedNote", "inventoryUnavailable", "libraryPending"]) {
         expect(wealth[key]).toBeTruthy();
       }
     }
@@ -95,6 +96,17 @@ describe("витрина кошелька", () => {
     expect(html).toContain("PRIVATE_MARKER");
     expect(html).not.toContain("MARKET_NOTE_MARKER");
     expect(html).not.toContain("UNAVAILABLE_MARKER");
+  });
+
+  it("витрина без библиотеки не показывает пустых цифр и объясняет почему", () => {
+    // Разбор старой формы: библиотеки в кошельке нет. Раньше на её месте
+    // выводилось выдуманное «2 099 036 ₽» — пересчёт прежней долларовой смеси
+    // по курсу.
+    const wealth = { ...makeWealth("ok"), library: null, unplayed: null };
+    const html = renderToStaticMarkup(createElement(WealthCard, { wealth, labels }));
+    expect(html).toContain("LIBRARY_PENDING_MARKER");
+    expect(html).not.toContain("PH");
+    expect(html).not.toContain("AP");
   });
 
   it("доступный инвентарь получает рыночную подпись", () => {

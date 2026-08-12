@@ -17,6 +17,7 @@ interface Labels {
   privateInventory: string;
   inventoryUnavailable: string;
   storeNote: string;
+  libraryPending: string;
 }
 
 const rub = (value: number) => `${Math.round(value).toLocaleString("ru-RU")} ₽`;
@@ -32,14 +33,21 @@ export function WealthCard({ wealth, labels }: { wealth: Wealth; labels: Labels 
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <Stat label={labels.library} value={rub(wealth.library.total)} />
+        <Stat
+          label={labels.library}
+          value={wealth.library ? rub(wealth.library.total) : "—"}
+        />
         <Stat
           label={labels.inventory}
           value={wealth.inventory.status === "ok" ? rub(wealth.inventory.total) : "—"}
         />
-        <Stat label={labels.unplayed} value={rub(wealth.unplayed.value)} />
-        <Stat label={labels.perHour} value={rub(wealth.library.perHour)} />
-        <Stat label={labels.avgPrice} value={rub(wealth.library.avgPrice)} />
+        {wealth.library && wealth.unplayed && (
+          <>
+            <Stat label={labels.unplayed} value={rub(wealth.unplayed.value)} />
+            <Stat label={labels.perHour} value={rub(wealth.library.perHour)} />
+            <Stat label={labels.avgPrice} value={rub(wealth.library.avgPrice)} />
+          </>
+        )}
         {wealth.inventory.cardsEstimated > 0 && (
           <Stat label={labels.cards} value={`${wealth.inventory.cardsEstimated}`} />
         )}
@@ -88,7 +96,8 @@ export function WealthCard({ wealth, labels }: { wealth: Wealth; labels: Labels 
         ) : (
           <div>{labels.marketNote}</div>
         )}
-        {wealth.library.estimated && <div>{labels.estimatedNote}</div>}
+        {wealth.library?.estimated && <div>{labels.estimatedNote}</div>}
+        {!wealth.library && <div>{labels.libraryPending}</div>}
       </div>
     </div>
   );

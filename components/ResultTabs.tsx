@@ -363,6 +363,7 @@ export function ResultTabs({ portrait, profile, steamId64, locale, isOwner = fal
                       privateInventory: t("deepDive.wealth.privateInventory"),
                       inventoryUnavailable: t("deepDive.wealth.inventoryUnavailable"),
                       storeNote: t("deepDive.wealth.storeNote"),
+                      libraryPending: t("deepDive.wealth.libraryPending"),
                     }}
                   />
                 )}

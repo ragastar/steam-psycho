@@ -43,18 +43,29 @@ describe("сборщик кошелька", () => {
     const { calculateWealth, CARD_AVERAGE_RUB } = await import("@/lib/wealth/calculate");
     const wealth = await calculateWealth(profile(), "1");
 
-    expect(wealth.library.total).toBe(200000);
-    expect(wealth.library.avgPrice).toBe(2000);
+    expect(wealth.library?.total).toBe(200000);
+    expect(wealth.library?.avgPrice).toBe(2000);
     // 20 евро по 100 плюс десять карточек по средней цене
     expect(wealth.inventory.total).toBeCloseTo(2000 + 10 * CARD_AVERAGE_RUB, 2);
     expect(wealth.total).toBeCloseTo(202000 + 10 * CARD_AVERAGE_RUB, 2);
     expect(wealth.complete).toBe(true);
   });
 
-  it("пересчитывает старую долларовую экономику по курсу", async () => {
+  it("не выдумывает стоимость библиотеки по разбору старой формы", async () => {
+    // Разбор без метки валюты сделан до перехода на единую рублёвую базу. Его
+    // сумма посчитана прежней смесью (магазин для верхушки, сторонний сервис
+    // для остальных, доллары) — ровно тем, ради замены чего база и менялась.
+    // Пересчёт такой суммы по курсу давал на боевом «стоимость аккаунта
+    // 2 099 036 ₽» при настоящих десятках тысяч. Пока разбор не пересчитан,
+    // библиотеки в кошельке нет вовсе, и расчёт считается неполным — значит
+    // хранится час, а не десять лет.
     const { calculateWealth } = await import("@/lib/wealth/calculate");
     const wealth = await calculateWealth(profile({ currency: undefined, totalLibraryValue: 2500 }), "1");
-    expect(wealth.library.total).toBe(200000);
+
+    expect(wealth.library).toBeNull();
+    expect(wealth.unplayed).toBeNull();
+    expect(wealth.total).toBe(wealth.inventory.total);
+    expect(wealth.complete).toBe(false);
   });
 
   it("показывает самые дорогие предметы и невыставляемые отдельно", async () => {
@@ -74,7 +85,7 @@ describe("сборщик кошелька", () => {
     const wealth = await calculateWealth(profile(), "1");
     expect(wealth.inventory.status).toBe("private");
     expect(wealth.complete).toBe(false);
-    expect(wealth.library.total).toBe(200000);
+    expect(wealth.library?.total).toBe(200000);
     vi.doUnmock("@/lib/wealth/inventory");
     vi.resetModules();
   });

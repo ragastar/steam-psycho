@@ -13,6 +13,12 @@ export interface Wealth {
   currency: "RUB";
   /** Библиотека плюс инвентарь. */
   total: number;
+  /**
+   * Библиотека. `null` — разбор сделан до перехода на единую рублёвую базу
+   * (у его экономики нет метки валюты): считать по нему нечего, а пересчёт
+   * прежней смешанной суммы по курсу давал на витрине миллионы из воздуха.
+   * Появится сам, когда разбор пересчитают.
+   */
   library: {
     total: number;
     avgPrice: number;
@@ -20,10 +26,11 @@ export interface Wealth {
     /** Часть суммы достроена по средней цене — это надо подписать на витрине. */
     estimated: boolean;
     unknownGames: number;
-  };
+  } | null;
+  /** Отсутствует по той же причине, что и `library`. */
   unplayed: {
     value: number;
-  };
+  } | null;
   inventory: {
     status: InventoryStatus;
     total: number;

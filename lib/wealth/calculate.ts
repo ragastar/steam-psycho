@@ -24,17 +24,15 @@ export async function calculateWealth(
   const rates = await getRates();
   const eurRub = rates?.eurRub ?? 0;
 
-  // Старые разборы считались в долларах: у покупателей профиль лежит вечно и
-  // пересчитан не будет. Метка валюты появилась вместе с рублёвой базой, её
-  // отсутствие и означает «доллары».
-  const libraryRub =
-    profile.economics.currency === "RUB"
-      ? profile.economics.totalLibraryValue
-      : profile.economics.totalLibraryValue * (rates?.usdRub ?? 0);
-  const unplayedRub =
-    profile.economics.currency === "RUB"
-      ? profile.economics.wastedValue
-      : profile.economics.wastedValue * (rates?.usdRub ?? 0);
+  // Разбор старой формы (без метки валюты) считался прежней смесью источников
+  // в долларах — той самой, ради замены которой база и менялась. Пересчитать
+  // такую сумму по курсу нельзя: на боевом это дало «стоимость аккаунта
+  // 2 099 036 ₽» вместо десятков тысяч. Пока разбор не пересчитан, библиотеки
+  // в кошельке нет, а расчёт помечается неполным — значит хранится час и
+  // повторится, когда разбор обновится.
+  const libraryKnown = profile.economics.currency === "RUB";
+  const libraryRub = profile.economics.totalLibraryValue;
+  const unplayedRub = profile.economics.wastedValue;
 
   const inventories = await Promise.all(
     INVENTORY_APPS.map((app) => fetchAppInventory(steamId64, app.appId, app.contextId)),
@@ -85,15 +83,17 @@ export async function calculateWealth(
 
   return {
     currency: "RUB",
-    total: round(libraryRub + inventoryRub),
-    library: {
-      total: round(libraryRub),
-      avgPrice: round(libraryRub / totalGames),
-      perHour: round(libraryRub / totalHours),
-      estimated: (profile.economics.estimatedGames ?? 0) > 0,
-      unknownGames: profile.economics.unknownGames ?? 0,
-    },
-    unplayed: { value: round(unplayedRub) },
+    total: round((libraryKnown ? libraryRub : 0) + inventoryRub),
+    library: libraryKnown
+      ? {
+          total: round(libraryRub),
+          avgPrice: round(libraryRub / totalGames),
+          perHour: round(libraryRub / totalHours),
+          estimated: (profile.economics.estimatedGames ?? 0) > 0,
+          unknownGames: profile.economics.unknownGames ?? 0,
+        }
+      : null,
+    unplayed: libraryKnown ? { value: round(unplayedRub) } : null,
     inventory: {
       status,
       total: round(inventoryRub),
@@ -103,6 +103,6 @@ export async function calculateWealth(
       cardsEstimated,
       unpricedItems,
     },
-    complete: status === "ok" && eurRub > 0,
+    complete: libraryKnown && status === "ok" && eurRub > 0,
   };
 }
