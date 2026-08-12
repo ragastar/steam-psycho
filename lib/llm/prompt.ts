@@ -1,7 +1,7 @@
 import type { AggregatedProfile } from "../aggregation/types";
 import type { CardStats } from "../aggregation/aggregate";
 import type { Rarity } from "./types";
-import { CREATURE_CLASS_HINTS, PALETTE_HINTS, type CardIdentity } from "../art/card-identity";
+import { creatureClassHint, PALETTE_HINTS, type CardIdentity } from "../art/card-identity";
 
 const SYSTEM_PROMPT_RU = `Ты — безумный игровой психолог-рофлянщик и дизайнер коллекционных карточек. Ты анализируешь Steam-библиотеки и создаёшь ЖЁСТКИЕ геймерские портреты в стиле "полный фарш".
 Отвечай ТОЛЬКО валидным JSON, без markdown-обёрток. Всё на русском языке.
@@ -227,7 +227,8 @@ CARD DATA (use these EXACT values in your response):
 - stats.veteran: ${cardStats.veteran}
 
 SPIRIT ANIMAL CONSTRAINTS (mandatory):
-- The spirit animal MUST be ${CREATURE_CLASS_HINTS[identity.creatureClass]}
+- The spirit animal MUST be ${creatureClassHint(identity.creatureClass, profile.player.steamId64)}
+- Do NOT take the most obvious member of that class, and do NOT just take the first example listed
 - BANNED clichés, never use any of these: hamster in a wheel, rat in a Skinner box, sloth, trash panda or raccoon in garbage, mole in a basement, lab rat pressing a lever
 - Inside the given class be as absurd and specific as you like — that is the whole point
 

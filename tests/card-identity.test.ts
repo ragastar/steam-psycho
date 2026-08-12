@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { selectCardIdentity, mostDistinctiveTrait, CREATURE_CLASS_HINTS, PALETTE_HINTS } from "@/lib/art/card-identity";
+import { selectCardIdentity, mostDistinctiveTrait, creatureClassHint, CREATURE_CLASSES, PALETTE_HINTS } from "@/lib/art/card-identity";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 import type { CardStats } from "@/lib/aggregation/aggregate";
 
@@ -40,18 +40,32 @@ describe("выбор класса существа", () => {
     expect(classes.size).toBeGreaterThan(1);
   });
 
-  it("классов четырнадцать, и у каждого есть подсказка для модели", () => {
-    const keys = Object.keys(CREATURE_CLASS_HINTS);
+  it("классов четырнадцать, и в каждом не меньше пяти примеров", () => {
+    const keys = Object.keys(CREATURE_CLASSES);
     expect(keys).toHaveLength(14);
     for (const key of keys) {
-      expect(CREATURE_CLASS_HINTS[key as keyof typeof CREATURE_CLASS_HINTS].length).toBeGreaterThan(10);
+      expect(CREATURE_CLASSES[key as keyof typeof CREATURE_CLASSES].examples.length).toBeGreaterThanOrEqual(5);
     }
   });
 
   it("грызуны — один класс из четырнадцати, а не половина выдачи", () => {
     // Ради этого всё и затевалось: восемь духов из пятнадцати были грызунами.
-    const pools = Object.values(CREATURE_CLASS_HINTS);
-    expect(pools.filter((hint) => /rodent|burrow/i.test(hint))).toHaveLength(1);
+    const labels = Object.values(CREATURE_CLASSES).map((c) => c.label);
+    expect(labels.filter((label) => /rodent|burrow/i.test(label))).toHaveLength(1);
+  });
+
+  it("порядок примеров крутится по людям", () => {
+    // Первый пример в списке модель берёт чаще прочих: подсказка для насекомых
+    // начиналась с «dung beetle», и навозный жук вышел трижды из трёх.
+    const firsts = new Set(
+      ["1", "2", "3", "4", "5"].map((n) => creatureClassHint("insects", "7656119800000000" + n).match(/for example ([^,]+)/)![1]),
+    );
+    expect(firsts.size).toBeGreaterThan(1);
+  });
+
+  it("подсказка перечисляет весь класс, а не один пример", () => {
+    const hint = creatureClassHint("insects", "1");
+    for (const example of CREATURE_CLASSES.insects.examples) expect(hint).toContain(example);
   });
 
   it("палитра расходится по людям и воспроизводима", () => {

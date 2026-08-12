@@ -12,12 +12,13 @@ import {
 } from "@/lib/steam/client";
 import { enrichGames } from "@/lib/steam/enrich";
 import { buildAggregatedProfile, calculateCardStats, calculateRarity } from "@/lib/aggregation/aggregate";
+import type { AggregatedProfile } from "@/lib/aggregation/types";
 import { SteamApiError } from "@/lib/steam/types";
 import type { AchievementGameData, OwnedGame } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { CACHE_TTL, portraitKey, profileKey, rateLimitKey, cardStatsKey, rarityKey, artIdentityKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
-import { ensureCardIdentityFromCache } from "@/lib/art/identity-store";
+import { ensureCardCompanions } from "@/lib/aggregation/companions";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -101,18 +102,22 @@ export async function POST(req: Request) {
     const ipHash = hashIp(ip);
 
     const cachedPortrait = await getCache(portraitKey(steamId64, locale));
-    if (cachedPortrait) {
-      // Разбор готов — но личность карточки могла не пережить смену версии
-      // ключа, а художнику без неё нечем красить рамку и задавать свет.
-      await ensureCardIdentityFromCache(steamId64);
+    const cachedPortraitProfile = cachedPortrait
+      ? await getCache<AggregatedProfile>(profileKey(steamId64))
+      : null;
+    if (cachedPortrait && cachedPortraitProfile) {
+      // Разбор готов — но спутники карточки могли не пережить смену версии
+      // своих ключей. Достраиваем их прямо здесь: считаются они из разбора
+      // начисто, а без них человек попал бы в петлю «данные устарели».
+      await ensureCardCompanions(steamId64, cachedPortraitProfile);
       logAnalysis({ steamId64, locale, cached: true, ipHash });
       console.log(`[analyze] ${steamId64} HIT portrait cache, total: ${Date.now() - t0}ms`);
       return NextResponse.json({ steamId64, cached: true });
     }
 
-    const cachedProfile = await getCache(profileKey(steamId64));
+    const cachedProfile = await getCache<AggregatedProfile>(profileKey(steamId64));
     if (cachedProfile) {
-      await ensureCardIdentityFromCache(steamId64);
+      await ensureCardCompanions(steamId64, cachedProfile);
       console.log(`[analyze] ${steamId64} HIT profile cache (no portrait yet), total: ${Date.now() - t0}ms`);
       return NextResponse.json({ steamId64, cached: true });
     }

@@ -14,21 +14,28 @@ export type CreatureClass =
   | "primates" | "livestock" | "cephalopods" | "crustaceans"
   | "prehistoric" | "mythic" | "mustelids" | "rodents";
 
-export const CREATURE_CLASS_HINTS: Record<CreatureClass, string> = {
-  birds: "a bird — owl, pelican, crow, ostrich, penguin, vulture, heron",
-  deepSea: "a deep-sea creature — anglerfish, blobfish, sperm whale, moray eel",
-  insects: "an insect or arachnid — dung beetle, mantis, tarantula, moth, ant",
-  reptiles: "a reptile or amphibian — iguana, gecko, crocodile, axolotl, toad",
-  hoofed: "a hoofed animal — goat, moose, donkey, camel, bull, tapir",
-  bigCats: "a large predator — tiger, lynx, wolf, hyena, snow leopard",
-  primates: "a primate — orangutan, baboon, lemur, gorilla, macaque",
-  livestock: "farm livestock — pig, sheep, rooster, cow, turkey, goose",
-  cephalopods: "a cephalopod — octopus, squid, cuttlefish, nautilus",
-  crustaceans: "a crustacean — crab, lobster, mantis shrimp, barnacle",
-  prehistoric: "a prehistoric beast — dinosaur, mammoth, trilobite, sabertooth",
-  mythic: "a mythical creature — dragon, griffin, kraken, chimera, golem",
-  mustelids: "a mustelid or bear — badger, otter, wolverine, raccoon, brown bear",
-  rodents: "a rodent or burrower — capybara, mole, beaver, porcupine, marmot",
+/**
+ * Примеры внутри класса перечисляются, но порядок крутится по человеку.
+ *
+ * Первый пример модель берёт заметно чаще остальных: подсказка для насекомых
+ * начиналась с «dung beetle», и навозный жук вышел трижды из трёх. Штамп просто
+ * переехал этажом ниже — с класса на конкретного зверя.
+ */
+export const CREATURE_CLASSES: Record<CreatureClass, { label: string; examples: string[] }> = {
+  birds: { label: "a bird", examples: ["pelican", "crow", "ostrich", "penguin", "vulture", "heron", "owl"] },
+  deepSea: { label: "a deep-sea creature", examples: ["blobfish", "sperm whale", "moray eel", "anglerfish", "oarfish", "sea cucumber"] },
+  insects: { label: "an insect or arachnid", examples: ["mantis", "tarantula", "moth", "leafcutter ant", "cicada", "dung beetle", "water strider"] },
+  reptiles: { label: "a reptile or amphibian", examples: ["iguana", "gecko", "crocodile", "axolotl", "toad", "chameleon"] },
+  hoofed: { label: "a hoofed animal", examples: ["goat", "moose", "donkey", "camel", "bull", "tapir"] },
+  bigCats: { label: "a large predator", examples: ["lynx", "hyena", "snow leopard", "tiger", "wolf", "caracal"] },
+  primates: { label: "a primate", examples: ["orangutan", "baboon", "lemur", "gorilla", "macaque", "tarsier"] },
+  livestock: { label: "farm livestock", examples: ["pig", "sheep", "rooster", "cow", "turkey", "goose"] },
+  cephalopods: { label: "a cephalopod", examples: ["octopus", "squid", "cuttlefish", "nautilus", "bobtail squid"] },
+  crustaceans: { label: "a crustacean", examples: ["lobster", "mantis shrimp", "barnacle", "hermit crab", "coconut crab", "krill"] },
+  prehistoric: { label: "a prehistoric beast", examples: ["mammoth", "trilobite", "sabertooth", "ankylosaur", "dunkleosteus", "giant sloth"] },
+  mythic: { label: "a mythical creature", examples: ["griffin", "kraken", "chimera", "golem", "dragon", "basilisk"] },
+  mustelids: { label: "a mustelid or bear", examples: ["otter", "wolverine", "badger", "brown bear", "marten", "honey badger"] },
+  rodents: { label: "a rodent or burrower", examples: ["capybara", "porcupine", "marmot", "beaver", "mole", "chinchilla"] },
 };
 
 export type Element =
@@ -163,6 +170,17 @@ function selectElement(profile: AggregatedProfile): Element {
     }
   }
   return best;
+}
+
+/**
+ * Подсказка модели: класс целиком, но с индивидуальным порядком примеров.
+ * Плюс прямой запрет брать самое очевидное — одного перемешивания мало.
+ */
+export function creatureClassHint(creatureClass: CreatureClass, steamId64: string): string {
+  const { label, examples } = CREATURE_CLASSES[creatureClass];
+  const offset = hashCode(`${steamId64}:creature`) % examples.length;
+  const rotated = [...examples.slice(offset), ...examples.slice(0, offset)];
+  return `${label} — for example ${rotated.join(", ")}`;
 }
 
 export function selectCardIdentity(

@@ -84,8 +84,17 @@ export function cardStatsKey(steamId64: string): string {
   return `cardstats:v1:${steamId64}`;
 }
 
+/**
+ * v2: редкость считается иначе (место в выборке вместо суммы часов). Записи
+ * под v1 посчитаны прежней формулой, по которой легендарным был каждый.
+ *
+ * Менять версию спутника карточки можно только вместе с достройкой в
+ * `ensureCardCompanions`: разбор выходит из кеша раньше, чем дошёл бы до
+ * пересчёта, и без достройки человек попадает в петлю «данные устарели» ↔
+ * «разбор уже есть».
+ */
 export function rarityKey(steamId64: string): string {
-  return `rarity:v1:${steamId64}`;
+  return `rarity:v2:${steamId64}`;
 }
 
 /**
