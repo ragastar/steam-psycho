@@ -1,4 +1,5 @@
 import { Bot } from "grammy";
+import { SITE_URL } from "@/lib/site";
 
 let bot: Bot | null = null;
 let botInitPromise: Promise<void> | null = null;
@@ -31,13 +32,11 @@ export async function ensureWebhook(): Promise<void> {
   const b = getBot();
   if (!b) return;
 
-  const domain = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
-  if (!domain) {
-    console.warn("[telegram] No NEXT_PUBLIC_SITE_URL set, skipping webhook check");
-    return;
-  }
-
-  const expectedUrl = `${domain.replace(/\/$/, "")}/api/telegram/webhook`;
+  // Адрес сайта берётся из единого источника (lib/site.ts), а не из
+  // собственной переменной: NEXT_PUBLIC_SITE_URL в настройках никогда не
+  // существовало, поэтому проверка вебхука молча пропускалась и
+  // бот не мог выставить его сам — его приходилось ставить руками.
+  const expectedUrl = `${SITE_URL.replace(/\/$/, "")}/api/telegram/webhook`;
 
   try {
     const info = await b.api.getWebhookInfo();
