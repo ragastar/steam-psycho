@@ -17,6 +17,7 @@ import type { AchievementGameData, OwnedGame } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { CACHE_TTL, portraitKey, profileKey, rateLimitKey, cardStatsKey, rarityKey, artIdentityKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
+import { ensureCardIdentityFromCache } from "@/lib/art/identity-store";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -101,6 +102,9 @@ export async function POST(req: Request) {
 
     const cachedPortrait = await getCache(portraitKey(steamId64, locale));
     if (cachedPortrait) {
+      // Разбор готов — но личность карточки могла не пережить смену версии
+      // ключа, а художнику без неё нечем красить рамку и задавать свет.
+      await ensureCardIdentityFromCache(steamId64);
       logAnalysis({ steamId64, locale, cached: true, ipHash });
       console.log(`[analyze] ${steamId64} HIT portrait cache, total: ${Date.now() - t0}ms`);
       return NextResponse.json({ steamId64, cached: true });
@@ -108,6 +112,7 @@ export async function POST(req: Request) {
 
     const cachedProfile = await getCache(profileKey(steamId64));
     if (cachedProfile) {
+      await ensureCardIdentityFromCache(steamId64);
       console.log(`[analyze] ${steamId64} HIT profile cache (no portrait yet), total: ${Date.now() - t0}ms`);
       return NextResponse.json({ steamId64, cached: true });
     }

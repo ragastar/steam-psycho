@@ -39,3 +39,25 @@ describe("хранение личности карточки", () => {
     expect(await ensureCardIdentity(profile, stats, "76561198000000002")).toEqual(existing);
   });
 });
+
+describe("разбор из кеша тоже оставляет личность", () => {
+  it("достраивает запись по кешированному разбору", async () => {
+    const { ensureCardIdentityFromCache } = await import("@/lib/art/identity-store");
+    const { artIdentityKey, profileKey, cardStatsKey } = await import("@/lib/cache/keys");
+    store.set(profileKey("76561198000000003"), profile);
+    store.set(cardStatsKey("76561198000000003"), stats);
+
+    await ensureCardIdentityFromCache("76561198000000003");
+
+    expect(store.get(artIdentityKey("76561198000000003"))).toBeTruthy();
+  });
+
+  it("без разбора в кеше молчит, а не падает", async () => {
+    const { ensureCardIdentityFromCache } = await import("@/lib/art/identity-store");
+    const { artIdentityKey } = await import("@/lib/cache/keys");
+
+    await ensureCardIdentityFromCache("76561198000000004");
+
+    expect(store.get(artIdentityKey("76561198000000004"))).toBeUndefined();
+  });
+});
