@@ -138,6 +138,25 @@ export function findOpenOrder(accountId: number, steamId64: string): Order | nul
 }
 
 /**
+ * Запоминает номер платежа, выданный кассой, сразу при начале оплаты.
+ *
+ * Раньше он появлялся в заказе только вместе с подтверждением от кассы — то
+ * есть ровно тогда, когда и так всё хорошо. А нужен он в обратном случае:
+ * подтверждение потерялось, деньги списаны, и спросить у кассы «что там с этим
+ * платежом» не по чему. У оплаченного заказа номер не переписывается.
+ */
+export function setOrderProviderId(orderId: number, providerOrderId: string): void {
+  const db = getBillingDb();
+  if (!db) return;
+  try {
+    db.prepare("UPDATE orders SET provider_order_id = ? WHERE id = ? AND status = 'created'")
+      .run(providerOrderId, orderId);
+  } catch (err) {
+    console.error("[billing] не удалось запомнить номер платежа:", err);
+  }
+}
+
+/**
  * Подтверждение оплаты от кассы. Вебхуки от касс приходят по два штатно —
  * второй вызов для уже подтверждённого заказа должен отвечать "already" и
  * ничего не менять, а не выдавать второе право.

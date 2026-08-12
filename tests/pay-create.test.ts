@@ -424,3 +424,25 @@ describe("платить за несуществующий разбор нель
     expect(billing.findOpenOrder(accountId, NO_CARD)).toBeNull();
   });
 });
+
+describe("номер платежа запоминается сразу", () => {
+  let dbPath: string;
+
+  beforeEach(() => {
+    dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pay-create-")), "identity.db");
+  });
+
+  it("заказ знает номер платежа ещё до подтверждения от кассы", async () => {
+    // Раньше номер появлялся только вместе с подтверждением, то есть когда и
+    // так всё хорошо. Нужен он в обратном случае: подтверждение потерялось,
+    // деньги списаны, и спросить у кассы не по чему.
+    const { identity, billing, session, route } = await freshWorld({ dbPath, mode: "stub" });
+    const accountId = makeAccount(identity);
+
+    await route.POST(createRequest({ steamId64: STEAM_ID, locale: "ru" }, cookieFor(session, accountId)));
+
+    const order = billing.findOpenOrder(accountId, STEAM_ID)!;
+    expect(order.providerOrderId).toBeTruthy();
+    expect(order.status).toBe("created");
+  });
+});

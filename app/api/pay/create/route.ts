@@ -9,6 +9,7 @@ import {
   findOpenOrder,
   findOrder,
   hasEntitlement,
+  setOrderProviderId,
   type Order,
 } from "@/lib/billing/store";
 import { CACHE_TTL, payCreateKey, portraitKey } from "@/lib/cache/keys";
@@ -137,6 +138,10 @@ export async function POST(req: Request) {
       amountKop: order.amountKop,
       locale: safeLocale,
     });
+    // Номер платежа запоминаем сразу: если подтверждение от кассы потеряется,
+    // это единственная ниточка, по которой можно спросить «что там с деньгами».
+    setOrderProviderId(order.id, payment.providerOrderId);
+
     return NextResponse.json({ payUrl: payment.payUrl });
   } catch (err) {
     // Касса не ответила. Заказ остаётся незакрытым — следующее нажатие
