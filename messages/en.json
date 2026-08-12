@@ -397,6 +397,7 @@
     "loginHint": "Sign in so the purchase sticks. It's tied to your account, not to this browser.",
     "alreadyOwned": "You already own this read — refreshing the page.",
     "failed": "Couldn't start the payment. Give it another go.",
+    "expired": "The analysis expired while you were reading. Refresh the page and it will be recomputed.",
     "unavailable": "Payments aren't hooked up yet — there's nothing to buy right now."
   },
   "pay": {
@@ -413,6 +414,7 @@
     "closed": "This order is already closed — there's nothing left to pay.",
     "backToResult": "Back to the read",
     "disclaimer": "Entertainment, not a psychologist's report. You're buying a joke about yourself, not a diagnosis.",
+    "terms": "Terms and refund policy",
     "return": {
       "title": "Back from checkout",
       "waiting": "Waiting for the bank to confirm...",

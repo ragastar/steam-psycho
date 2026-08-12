@@ -31,6 +31,7 @@ export const metadata: Metadata = {
 export default async function StubCheckoutPage({ params: rawParams }: Props) {
   const params = await rawParams;
   const t = await getTranslations();
+  const termsUrl = process.env.TERMS_URL;
 
   // Поддельной кассы может не быть вовсе: режим не `stub` либо боевое окружение
   // без явного PAYWALL_ALLOW_STUB_IN_PROD=true. Оба предохранителя внутри.
@@ -98,6 +99,18 @@ export default async function StubCheckoutPage({ params: rawParams }: Props) {
           <p className="text-sm leading-relaxed text-gray-300 border-l-2 border-gray-700 pl-3">
             {t("pay.disclaimer")}
           </p>
+
+          {/* Ссылка на оферту и правила возврата. Появляется только когда адрес
+              задан: выдумывать правила возврата за владельца нельзя, а до
+              настоящей кассы их и не существует. Читается на сервере при показе
+              страницы, а не вшивается в сборку. */}
+          {termsUrl && (
+            <p className="text-xs text-gray-500">
+              <a href={termsUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">
+                {t("pay.terms")}
+              </a>
+            </p>
+          )}
 
           {open ? (
             <StubCheckoutButtons

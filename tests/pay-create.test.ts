@@ -38,6 +38,15 @@ async function freshWorld(opts: {
   // напрямую, в том числе там, где маршрут отказывает не дойдя до базы, —
   // без этого «заказов нет» падало бы как «нет такой таблицы».
   billing.billingAvailable();
+  // Разбор должен существовать: маршрут отказывается продавать то, чего нет.
+  // Кладём карточки обоим номерам — «купить чужой разбор» проверяется отдельным
+  // тестом, и падать он должен по причине прав, а не из-за пустого кеша.
+  const cache = await import("@/lib/cache/redis");
+  const keys = await import("@/lib/cache/keys");
+  for (const id of [STEAM_ID, OTHER_STEAM_ID]) {
+    await cache.setCache(keys.portraitKey(id, "ru"), { title: "карточка" }, 3600);
+  }
+
   return { identity, billing, session, price, route };
 }
 
@@ -389,5 +398,29 @@ describe("беда на нашей стороне не открывает дос
     // ещё раз»: приёмщика при live нет ВСЕГДА, пока владелец не подключит кассу.
     expect((await res.json()).code).toBe("no_provider");
     expect(countOrders()).toBe(0);
+  });
+});
+
+describe("платить за несуществующий разбор нельзя", () => {
+  let dbPath: string;
+
+  beforeEach(() => {
+    dbPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pay-create-")), "identity.db");
+  });
+
+  it("на номер без карточки заказ не заводится", async () => {
+    // Раньше можно было отправить любые семнадцать цифр и заплатить 199 ₽ за
+    // страницу «данные устарели»: существование разбора не проверялось вовсе.
+    const { identity, billing, session, route } = await freshWorld({ dbPath, mode: "stub" });
+    const accountId = makeAccount(identity);
+    const NO_CARD = "76561197990915400";
+
+    const res = await route.POST(
+      createRequest({ steamId64: NO_CARD, locale: "ru" }, cookieFor(session, accountId)),
+    );
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).code).toBe("no_analysis");
+    expect(billing.findOpenOrder(accountId, NO_CARD)).toBeNull();
   });
 });

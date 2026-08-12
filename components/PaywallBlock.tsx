@@ -33,7 +33,7 @@ interface PaywallBlockProps {
 }
 
 /** Отказы кассы, у каждого свой текст: «попробуй ещё раз» на выключенной кассе — вредный совет. */
-type Refusal = "" | "alreadyOwned" | "failed" | "unavailable";
+type Refusal = "" | "alreadyOwned" | "failed" | "unavailable" | "expired";
 
 /**
  * Список повторяет платную часть карточки один в один. Иконки те же, что на
@@ -127,7 +127,12 @@ export function PaywallBlock({ steamId64, locale, lockedCount, loginOutcome = nu
       // Отказ на срок решает не статус, а `code`: «касса не подключена» держится
       // до вмешательства владельца, и совет «попробуй ещё раз» на него — обещание,
       // которое не сбудется ни разу. Честное «пока нельзя» полезнее.
-      setRefusal(data.code === "no_provider" ? "unavailable" : "failed");
+      // Отказ на срок решает не статус, а `code`. «Разбора нет» — это не
+      // поломка кассы: карточка успела истечь, пока человек читал витрину, и
+      // помогает не повтор нажатия, а пересчёт разбора.
+      setRefusal(
+        data.code === "no_provider" ? "unavailable" : data.code === "no_analysis" ? "expired" : "failed",
+      );
     }
 
     setPending(false);

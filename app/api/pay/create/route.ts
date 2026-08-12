@@ -11,8 +11,8 @@ import {
   hasEntitlement,
   type Order,
 } from "@/lib/billing/store";
-import { CACHE_TTL, payCreateKey } from "@/lib/cache/keys";
-import { incrementRateLimit } from "@/lib/cache/redis";
+import { CACHE_TTL, payCreateKey, portraitKey } from "@/lib/cache/keys";
+import { getCache, incrementRateLimit } from "@/lib/cache/redis";
 import { getClientIp } from "@/lib/http/client-ip";
 import { readSessionFromRequest } from "@/lib/identity/session";
 
@@ -100,6 +100,19 @@ export async function POST(req: Request) {
   // Право проверяется ДО создания заказа: уже купил — заказа не будет.
   if (hasEntitlement(accountId, steamId64)) {
     return NextResponse.json({ alreadyOwned: true }, { status: 409 });
+  }
+
+  // Разбора нет — платить не за что. Существование ЧУЖОГО разбора при этом
+  // по-прежнему не запрещено (решение владельца: покупать можно любой), речь
+  // только о том, что покупаемое должно существовать. Без этой проверки можно
+  // было завести заказ на любые семнадцать цифр и заплатить за страницу
+  // «данные устарели». Проверяются обе локали: карточка могла быть создана
+  // по-русски, а покупают её с английской страницы.
+  const analysisExists =
+    (await getCache(portraitKey(steamId64, safeLocale))) ??
+    (await getCache(portraitKey(steamId64, safeLocale === "ru" ? "en" : "ru")));
+  if (!analysisExists) {
+    return NextResponse.json({ error: "no analysis", code: "no_analysis" }, { status: 404 });
   }
 
   // Приёмщик спрашивается тоже до создания заказа: при `live` его сегодня нет,
