@@ -19,6 +19,8 @@ export async function calculateWealth(
   profile: AggregatedProfile,
   steamId64: string,
 ): Promise<Wealth> {
+  const round = (n: number) => Math.round(n * 100) / 100;
+
   const rates = await getRates();
   const eurRub = rates?.eurRub ?? 0;
 
@@ -41,6 +43,7 @@ export async function calculateWealth(
   let inventoryRub = 0;
   let itemCount = 0;
   let cardsEstimated = 0;
+  let unpricedItems = 0;
   const items: WealthItem[] = [];
   const notable: string[] = [];
   let status = inventories[0].status;
@@ -57,8 +60,16 @@ export async function calculateWealth(
     if (app.priced) {
       inventoryRub += inv.totalEur * eurRub;
       for (const item of inv.items) {
-        if (item.priceEur) items.push({ name: item.name, qty: item.qty, rub: item.priceEur * eurRub });
-        else if (!item.marketable && notable.length < MAX_NOTABLE) notable.push(item.name);
+        if (item.priceEur !== undefined) {
+          const unitRub = item.priceEur * eurRub;
+          items.push({ name: item.name, qty: item.qty, unitRub: round(unitRub), totalRub: round(unitRub * item.qty) });
+        } else if (item.marketable) {
+          // Выставляемый предмет, которого рынок не оценил (обычное дело у CS2/Dota):
+          // денег за него нет, но пропадать с витрины молча он не должен.
+          unpricedItems += item.qty;
+        } else if (notable.length < MAX_NOTABLE) {
+          notable.push(item.name);
+        }
       }
     } else {
       cardsEstimated = inv.itemCount;
@@ -66,10 +77,11 @@ export async function calculateWealth(
     }
   }
 
-  const top = items.sort((a, b) => b.rub * b.qty - a.rub * a.qty).slice(0, TOP_ITEMS);
+  // Топ — по стоимости всей стопки, а не по цене штуки: двадцать копий по рублю
+  // дороже одного ножа за пятнадцать, хоть штучно и дешевле.
+  const top = items.sort((a, b) => b.totalRub - a.totalRub).slice(0, TOP_ITEMS);
   const totalGames = profile.stats.totalGames || 1;
   const totalHours = profile.stats.totalPlaytimeHours || 1;
-  const round = (n: number) => Math.round(n * 100) / 100;
 
   return {
     currency: "RUB",
@@ -86,9 +98,10 @@ export async function calculateWealth(
       status,
       total: round(inventoryRub),
       itemCount,
-      top: top.map((item) => ({ ...item, rub: round(item.rub) })),
+      top,
       notable,
       cardsEstimated,
+      unpricedItems,
     },
     complete: status === "ok" && eurRub > 0,
   };

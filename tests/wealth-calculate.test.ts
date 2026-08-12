@@ -78,4 +78,64 @@ describe("сборщик кошелька", () => {
     vi.doUnmock("@/lib/wealth/inventory");
     vi.resetModules();
   });
+
+  it("стопка дешёвых копий обгоняет дорогую поштучно вещь, если стоит дороже в сумме", async () => {
+    vi.doMock("@/lib/wealth/inventory", () => ({
+      INVENTORY_APPS: [{ appId: 730, contextId: 2, priced: true }],
+      fetchAppInventory: async () => ({
+        appId: 730,
+        status: "ok",
+        totalEur: 0.35,
+        itemCount: 21,
+        items: [
+          // 20 копий по 1 ₽ — стопка стоит 20 ₽
+          { name: "Наклейка", qty: 20, priceEur: 0.01, marketable: true },
+          // 1 копия по 15 ₽ — штучно дороже, но стопкой дешевле
+          { name: "Нож", qty: 1, priceEur: 0.15, marketable: true },
+        ],
+      }),
+    }));
+    vi.resetModules();
+    const { calculateWealth } = await import("@/lib/wealth/calculate");
+    const wealth = await calculateWealth(profile(), "1");
+
+    expect(wealth.inventory.top[0].name).toBe("Наклейка");
+    expect(wealth.inventory.top[0].unitRub).toBeCloseTo(1, 2);
+    expect(wealth.inventory.top[0].totalRub).toBeCloseTo(20, 2);
+    expect(wealth.inventory.top[1].name).toBe("Нож");
+    expect(wealth.inventory.top[1].unitRub).toBeCloseTo(15, 2);
+    expect(wealth.inventory.top[1].totalRub).toBeCloseTo(15, 2);
+
+    vi.doUnmock("@/lib/wealth/inventory");
+    vi.resetModules();
+  });
+
+  it("выставляемый предмет без цены в прайс-листе не пропадает молча", async () => {
+    vi.doMock("@/lib/wealth/inventory", () => ({
+      INVENTORY_APPS: [{ appId: 730, contextId: 2, priced: true }],
+      fetchAppInventory: async () => ({
+        appId: 730,
+        status: "ok",
+        totalEur: 15,
+        itemCount: 4,
+        items: [
+          { name: "Нож", qty: 1, priceEur: 15, marketable: true },
+          // Выставляемый, но рынок цену не знает — не должен пропасть с витрины
+          { name: "Загадочный шеврон", qty: 3, marketable: true },
+        ],
+      }),
+    }));
+    vi.resetModules();
+    const { calculateWealth } = await import("@/lib/wealth/calculate");
+    const wealth = await calculateWealth(profile(), "1");
+
+    expect(wealth.inventory.unpricedItems).toBe(3);
+    // Сумма считается по totalEur из инвентаря (15 евро * 100 = 1500 ₽) — шеврон в цену не входит
+    expect(wealth.inventory.total).toBeCloseTo(1500, 2);
+    expect(wealth.inventory.notable).not.toContain("Загадочный шеврон");
+    expect(wealth.inventory.top.map((item) => item.name)).not.toContain("Загадочный шеврон");
+
+    vi.doUnmock("@/lib/wealth/inventory");
+    vi.resetModules();
+  });
 });
