@@ -100,3 +100,99 @@ describe("инвентарь", () => {
     expect((await fetchAppInventory("1", 730, 2)).status).toBe("unavailable");
   });
 });
+
+describe("ответы Steam, которые не являются отказом", () => {
+  it("инвентарь игры, которой у человека нет, — это не сбой связи", async () => {
+    // Живая проверка 2026-08-12 на 76561198140642959: инвентарь аккаунта открыт
+    // (730 и 753 отвечают 200 с предметами), а 440 и 620 — 401 с телом null.
+    // TF2 у человека просто нет. Считать это «Steam не ответил» нельзя: один
+    // такой ответ прежде обнулял витрину, где деньги уже были посчитаны.
+    fetchSpy.mockResolvedValue(new Response("null", { status: 401 }));
+    const { fetchAppInventory } = await import("@/lib/wealth/inventory");
+    const inv = await fetchAppInventory("1", 440, 2);
+
+    expect(inv.status).toBe("missing");
+    expect(inv.itemCount).toBe(0);
+  });
+
+  it("ограничение Steam по частоте — отдельное состояние, его есть смысл переспросить", async () => {
+    fetchSpy.mockResolvedValue(new Response("null", { status: 429 }));
+    const { fetchAppInventory } = await import("@/lib/wealth/inventory");
+    const inv = await fetchAppInventory("1", 730, 2);
+
+    expect(inv.status).toBe("throttled");
+  });
+});
+
+describe("обход всех инвентарей", () => {
+  it("спрашивает по очереди, а не залпом", async () => {
+    // Steam режет по адресу примерно после десятка обращений подряд (замер
+    // 2026-08-12). Четыре параллельных запроса — прямой путь получить 429 на
+    // всё сразу.
+    let inFlight = 0;
+    let maxInFlight = 0;
+    fetchSpy.mockImplementation(async () => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await Promise.resolve();
+      inFlight--;
+      return new Response(JSON.stringify(INVENTORY), { status: 200 });
+    });
+    const { fetchInventories, INVENTORY_APPS } = await import("@/lib/wealth/inventory");
+    const all = await fetchInventories("1", { pause: async () => {} });
+
+    expect(all).toHaveLength(INVENTORY_APPS.length);
+    expect(maxInFlight).toBe(1);
+  });
+
+  it("переспрашивает один раз, если Steam ограничил частоту", async () => {
+    const { INVENTORY_APPS, fetchInventories } = await import("@/lib/wealth/inventory");
+    let call = 0;
+    fetchSpy.mockImplementation(async () => {
+      call++;
+      // Первый инвентарь получает отказ по частоте, переспрос проходит.
+      if (call === 1) return new Response("null", { status: 429 });
+      return new Response(JSON.stringify(INVENTORY), { status: 200 });
+    });
+    const all = await fetchInventories("1", { pause: async () => {} });
+
+    expect(call).toBe(INVENTORY_APPS.length + 1);
+    expect(all.every((inv) => inv.status === "ok")).toBe(true);
+  });
+
+  it("переспрашивает не больше одного раза за весь обход", async () => {
+    // Иначе страница результата встанет на четыре паузы подряд ради инвентаря,
+    // которого всё равно не будет: если лимит держится, он держится для всех.
+    fetchSpy.mockResolvedValue(new Response("null", { status: 429 }));
+    const { INVENTORY_APPS, fetchInventories } = await import("@/lib/wealth/inventory");
+    let call = 0;
+    fetchSpy.mockImplementation(async () => {
+      call++;
+      return new Response("null", { status: 429 });
+    });
+    const all = await fetchInventories("1", { pause: async () => {} });
+
+    expect(call).toBe(INVENTORY_APPS.length + 1);
+    expect(all.every((inv) => inv.status === "throttled")).toBe(true);
+  });
+});
+
+describe("бюджет времени на обход", () => {
+  it("перестаёт спрашивать Steam, когда время вышло", async () => {
+    // Steam лёг: каждый запрос упирается в свой потолок. Дальше бюджета обход
+    // не идёт — оплаченная страница не должна ждать инвентарь двадцать секунд.
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify(INVENTORY), { status: 200 }));
+    const { fetchInventories, INVENTORY_APPS } = await import("@/lib/wealth/inventory");
+    let clock = 0;
+    const all = await fetchInventories("1", {
+      pause: async () => {},
+      // Первый запрос успевает, дальше время «истекает».
+      now: () => (clock += 10_000),
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(all).toHaveLength(INVENTORY_APPS.length);
+    expect(all[0].status).toBe("ok");
+    expect(all.slice(1).every((inv) => inv.status === "unavailable")).toBe(true);
+  });
+});

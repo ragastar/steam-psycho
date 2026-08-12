@@ -11,7 +11,17 @@ export const INVENTORY_APPS = [
   { appId: 753, contextId: 6, priced: false }, // карточки, эмоции, фоны
 ] as const;
 
-export type InventoryStatus = "ok" | "private" | "unavailable";
+/**
+ * `missing` — у человека нет этой игры, и инвентаря для неё не существует.
+ * Steam отвечает на такой запрос `401` с телом `null`, и это НЕ отказ: живая
+ * проверка 2026-08-12 на открытом аккаунте показала 200 с предметами по CS2 и
+ * карточкам одновременно с 401 по TF2 и Portal 2, которых у человека нет.
+ * Пустой существующий контекст отвечает иначе — 200 и `total_inventory_count: 0`.
+ *
+ * `throttled` — ограничение по частоте (429). Единственное состояние, которое
+ * имеет смысл переспросить: Steam отпускает за минуту-две.
+ */
+export type InventoryStatus = "ok" | "missing" | "private" | "throttled" | "unavailable";
 
 export interface InventoryItem {
   name: string;
@@ -76,6 +86,8 @@ export async function fetchAppInventory(
       { signal: AbortSignal.timeout(4000) },
     );
     if (res.status === 403) return empty(appId, "private");
+    if (res.status === 401) return empty(appId, "missing");
+    if (res.status === 429) return empty(appId, "throttled");
     if (!res.ok) return empty(appId, "unavailable");
     raw = (await res.json()) as SteamInventory | null;
   } catch {
@@ -115,4 +127,61 @@ export async function fetchAppInventory(
   const totalEur = items.reduce((sum, item) => sum + (item.priceEur ?? 0) * item.qty, 0);
 
   return { appId, status: "ok", items, totalEur, itemCount };
+}
+
+/**
+ * Пауза между обращениями к Steam и после отказа по частоте.
+ *
+ * Замер 2026-08-12: примерно после десятка обращений к `steamcommunity.com/inventory`
+ * с одного адреса Steam начинает отвечать 429 на всё подряд и отпускает через
+ * полторы-две минуты. Один расчёт кошелька — четыре обращения, поэтому залпом
+ * их слать нельзя: так два-три посетителя подряд оставляют без инвентаря и
+ * себя, и всех следующих.
+ */
+const GAP_MS = 250;
+const RETRY_MS = 1500;
+
+/**
+ * Потолок на весь обход. Очередь вместо залпа стоит времени: если Steam лёг и
+ * каждый запрос упирается в свой четырёхсекундный потолок, обход с переспросом
+ * занял бы больше двадцати секунд — и всё это на уже оплаченной странице,
+ * которая рисуется на сервере. Дальше бюджета инвентарь не спрашиваем вовсе.
+ */
+const SWEEP_BUDGET_MS = 12_000;
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Все инвентари одного человека — по очереди, с одним переспросом на весь обход.
+ *
+ * Переспрос ровно один: если лимит держится, он держится для всех четырёх
+ * запросов, и четыре паузы подряд задержали бы оплаченную страницу впустую.
+ */
+export async function fetchInventories(
+  steamId64: string,
+  { pause = wait, now = Date.now }: {
+    pause?: (ms: number) => Promise<unknown>;
+    now?: () => number;
+  } = {},
+): Promise<AppInventory[]> {
+  const deadline = now() + SWEEP_BUDGET_MS;
+  const out: AppInventory[] = [];
+  let retries = 1;
+
+  for (const app of INVENTORY_APPS) {
+    if (now() >= deadline) {
+      out.push(empty(app.appId, "unavailable"));
+      continue;
+    }
+    if (out.length > 0) await pause(GAP_MS);
+    let inv = await fetchAppInventory(steamId64, app.appId, app.contextId);
+    if (inv.status === "throttled" && retries > 0 && now() < deadline) {
+      retries--;
+      await pause(RETRY_MS);
+      inv = await fetchAppInventory(steamId64, app.appId, app.contextId);
+    }
+    out.push(inv);
+  }
+
+  return out;
 }
