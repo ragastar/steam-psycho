@@ -1,6 +1,7 @@
 import type { AggregatedProfile } from "../aggregation/types";
 import type { CardStats } from "../aggregation/aggregate";
 import type { Rarity } from "./types";
+import { CREATURE_CLASS_HINTS, PALETTE_HINTS, type CardIdentity } from "../art/card-identity";
 
 const SYSTEM_PROMPT_RU = `Ты — безумный игровой психолог-рофлянщик и дизайнер коллекционных карточек. Ты анализируешь Steam-библиотеки и создаёшь ЖЁСТКИЕ геймерские портреты в стиле "полный фарш".
 Отвечай ТОЛЬКО валидным JSON, без markdown-обёрток. Всё на русском языке.
@@ -20,11 +21,11 @@ const SYSTEM_PROMPT_RU = `Ты — безумный игровой психол�
     { "icon": "эмодзи", "title": "Заголовок-панч (3-5 слов)", "text": "ЖЁСТКИЙ roast с РЕАЛЬНЫМИ цифрами, мат приветствуется", "stat": "ключевая цифра", "severity": "critical|legendary|epic|rare", "source": "КОНКРЕТНЫЙ источник цифры, напр. '88 игр в библиотеке', 'Cyberpunk 2077 — 3ч из 100ч средних', '17% из 88 игр'" }
   ],
   "spirit_game": "Название из топ игр",
-  "spirit_animal": { "name": "ЛЮБОЕ существо — чем абсурднее тем лучше, если подходит", "description": "Почему именно это существо (1 предложение, с юмором)", "art_description": "ALWAYS IN ENGLISH: visual description for art generator — creature pose, details, style (1-2 sentences)" },
+  "spirit_animal": { "name": "Существо ИЗ ЗАДАННОГО КЛАССА (см. SPIRIT ANIMAL CONSTRAINTS) — чем точнее и абсурднее, тем лучше", "description": "Почему именно это существо (1 предложение, с юмором)", "art_description": "ALWAYS IN ENGLISH: visual description for art generator — creature pose, details, style (1-2 sentences)" },
   "lore": "2-3 предложения бэкстори как будто писал пьяный летописец в таверне — эпично но с мемами",
   "quote": "Максимально токсичная/смешная цитата от лица игрока",
   "art_mood": "Настроение для арта (напр. 'epic battle at sunset', 'peaceful night gaming session')",
-  "art_scene": "Описание сцены для арта (1-2 предложения)",
+  "art_scene": "Сцена в мире его игр, без людей и без комнаты (см. ART SCENE CONSTRAINTS), 1-2 предложения",
   "psycho_profile": {
     "big_five": { "openness": <0-100>, "conscientiousness": <0-100>, "extraversion": <0-100>, "agreeableness": <0-100>, "neuroticism": <0-100> },
     "big_five_labels": { "openness": "Дерзкий ярлык", "conscientiousness": "Дерзкий ярлык", "extraversion": "Дерзкий ярлык", "agreeableness": "Дерзкий ярлык", "neuroticism": "Дерзкий ярлык" },
@@ -47,7 +48,7 @@ const SYSTEM_PROMPT_RU = `Ты — безумный игровой психол�
 - НИКОГДА не выдумывай числа, которых нет в CARD DATA. Нет данных — шути без цифры
 - Roasts должны БИТЬ В БОЛЬНОЕ: не "Вы играете много в Dota" а "Ёбаный ты задрот, 3000 часов в Доту слил — мог бы язык выучить или хотя бы пресс накачать"
 - spirit_game: из топ игр, ТОЧНОЕ название
-- spirit_animal: ЛЮБОЕ существо (мифическое, реальное, фэнтезийное), НЕ из фиксированного пула. Чем точнее и абсурднее — тем лучше. "Ленивец с геморроем" если чел играет по 30 мин в неделю
+- spirit_animal: существо из заданного класса (мифическое, реальное, фэнтезийное), НЕ из фиксированного пула. Чем точнее и абсурднее — тем лучше. "Ленивец с геморроем" если чел играет по 30 мин в неделю
 - spirit_animal.art_description: ВСЕГДА НА АНГЛИЙСКОМ — визуальное описание для арт-генератора
 - lore: как будто пьяный бард рассказывает в таверне — "В далёкие времена, когда Steam ещё не высасывал зарплату..."
 - quote: максимально мемная/токсичная — "Я не задрот, я инвестор в виртуальную недвижимость"
@@ -76,11 +77,11 @@ Response format:
     { "icon": "emoji", "title": "Punch-title (3-5 words)", "text": "BRUTAL roast with REAL numbers, profanity welcome", "stat": "key stat", "severity": "critical|legendary|epic|rare", "source": "SPECIFIC source, e.g. '88 games in library', 'Cyberpunk 2077 — 3h out of 100h avg', '17% of 88 games'" }
   ],
   "spirit_game": "Game name from top games",
-  "spirit_animal": { "name": "ANY creature — the more absurd the better if it fits", "description": "Why this creature fits (1 sentence, funny)", "art_description": "ALWAYS IN ENGLISH: visual description for art generator — creature pose, details, style (1-2 sentences)" },
+  "spirit_animal": { "name": "A creature FROM THE GIVEN CLASS (see SPIRIT ANIMAL CONSTRAINTS) — the more precise and absurd the better", "description": "Why this creature fits (1 sentence, funny)", "art_description": "ALWAYS IN ENGLISH: visual description for art generator — creature pose, details, style (1-2 sentences)" },
   "lore": "2-3 sentences as if written by a drunk bard in a tavern — epic but with memes",
   "quote": "Maximum toxic/funny quote from the player's perspective",
   "art_mood": "Mood for art (e.g. 'epic battle at sunset')",
-  "art_scene": "Art scene description (1-2 sentences)",
+  "art_scene": "A scene in the world of their games, no humans, no room (see ART SCENE CONSTRAINTS), 1-2 sentences",
   "psycho_profile": {
     "big_five": { "openness": <0-100>, "conscientiousness": <0-100>, "extraversion": <0-100>, "agreeableness": <0-100>, "neuroticism": <0-100> },
     "big_five_labels": { "openness": "Savage label", "conscientiousness": "Savage label", "extraversion": "Savage label", "agreeableness": "Savage label", "neuroticism": "Savage label" },
@@ -103,7 +104,7 @@ RULES:
 - NEVER invent numbers that are not in CARD DATA. No data — joke without a figure
 - Roasts must HIT WHERE IT HURTS: not "You play a lot of Dota" but "3000 hours in Dota, holy shit — you could've learned a language, got abs, or at least touched grass"
 - spirit_game: from top games, EXACT name
-- spirit_animal: ANY creature (mythical, real, fantasy), NOT from a fixed pool. The more accurate and absurd the better. "A sloth with hemorrhoids" if they play 30 min/week
+- spirit_animal: a creature from the class given in SPIRIT ANIMAL CONSTRAINTS. Inside that class be as accurate and absurd as you can
 - spirit_animal.art_description: ALWAYS IN ENGLISH — visual description for art generator
 - lore: like a drunk bard telling tales — "In the ancient times, before Steam started draining paychecks..."
 - quote: maximum meme/toxic energy — "I'm not addicted, I'm an investor in virtual real estate"
@@ -129,6 +130,7 @@ export function buildUserPrompt(
   profile: AggregatedProfile,
   cardStats: CardStats,
   rarity: Rarity,
+  identity: CardIdentity,
 ): string {
   const currency = profile.economics.currency;
   const topGamesStr = profile.topGames
@@ -222,5 +224,15 @@ CARD DATA (use these EXACT values in your response):
 - stats.exploration: ${cardStats.exploration}
 - stats.hoarding: ${cardStats.hoarding}
 - stats.social: ${cardStats.social}
-- stats.veteran: ${cardStats.veteran}`;
+- stats.veteran: ${cardStats.veteran}
+
+SPIRIT ANIMAL CONSTRAINTS (mandatory):
+- The spirit animal MUST be ${CREATURE_CLASS_HINTS[identity.creatureClass]}
+- BANNED clichés, never use any of these: hamster in a wheel, rat in a Skinner box, sloth, trash panda or raccoon in garbage, mole in a basement, lab rat pressing a lever
+- Inside the given class be as absurd and specific as you like — that is the whole point
+
+ART SCENE CONSTRAINTS (mandatory):
+- art_scene is the WORLD of their games (a Dota lane, an Elite starmap, a Deep Rock cave), never a room
+- NO humans, no gamer at a desk, no monitors, no energy drink cans, no dark bedroom
+- Lighting of this card is already chosen: ${PALETTE_HINTS[identity.palette]} — write art_mood and art_scene to fit it`;
 }

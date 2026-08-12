@@ -4,6 +4,7 @@ import type { CardPortrait, Rarity } from "./types";
 import type { CardStats } from "../aggregation/aggregate";
 import { CardPortraitSchema } from "./types";
 import { getSystemPrompt, buildUserPrompt } from "./prompt";
+import type { CardIdentity } from "../art/card-identity";
 import { generateWithAnthropic as generatePortraitViaAnthropic } from "./providers/anthropic";
 import { generateWithBridge, BridgeUnavailableError } from "./providers/claude-bridge";
 import { extractJSON } from "./json";
@@ -75,6 +76,7 @@ async function generateWithOpenAI(
   profile: AggregatedProfile,
   cardStats: CardStats,
   rarity: Rarity,
+  identity: CardIdentity,
   locale: string,
   model: string,
 ): Promise<CardPortrait> {
@@ -89,7 +91,7 @@ async function generateWithOpenAI(
     max_tokens: 5000,
     messages: [
       { role: "system", content: getSystemPrompt(locale) },
-      { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
+      { role: "user", content: buildUserPrompt(profile, cardStats, rarity, identity) },
     ],
   });
 
@@ -109,7 +111,7 @@ async function generateWithOpenAI(
       max_tokens: 5000,
       messages: [
         { role: "system", content: getSystemPrompt(locale) },
-        { role: "user", content: buildUserPrompt(profile, cardStats, rarity) },
+        { role: "user", content: buildUserPrompt(profile, cardStats, rarity, identity) },
         { role: "assistant", content: text },
         {
           role: "user",
@@ -152,6 +154,7 @@ export async function generatePortrait(
   profile: AggregatedProfile,
   cardStats: CardStats,
   rarity: Rarity,
+  identity: CardIdentity,
   locale: string,
   provider?: LLMProvider,
 ): Promise<GenerationResult> {
@@ -162,7 +165,7 @@ export async function generatePortrait(
     try {
       const result = await generateWithBridge(
         getSystemPrompt(locale),
-        buildUserPrompt(profile, cardStats, rarity),
+        buildUserPrompt(profile, cardStats, rarity, identity),
       );
       return { portrait: result.portrait, provider: "claude-bridge", model: result.model };
     } catch (err) {
@@ -174,14 +177,14 @@ export async function generatePortrait(
       console.warn(`[llm] ${err.message}; ухожу на ${fallback ?? "никого — запасных ключей нет"}`);
       if (!fallback) throw err;
 
-      return generatePortrait(profile, cardStats, rarity, locale, fallback);
+      return generatePortrait(profile, cardStats, rarity, identity, locale, fallback);
     }
   }
 
   if (config.provider === "anthropic") {
     const result = await generatePortraitViaAnthropic(
       getSystemPrompt(locale),
-      buildUserPrompt(profile, cardStats, rarity),
+      buildUserPrompt(profile, cardStats, rarity, identity),
     );
     return {
       portrait: result.portrait,
@@ -195,7 +198,7 @@ export async function generatePortrait(
     };
   }
 
-  const portrait = await generateWithOpenAI(profile, cardStats, rarity, locale, model);
+  const portrait = await generateWithOpenAI(profile, cardStats, rarity, identity, locale, model);
   return { portrait, provider: config.provider, model };
 }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildAggregatedProfile, calculateCardStats, calculateRarity } from "@/lib/aggregation/aggregate";
 import { buildUserPrompt } from "@/lib/llm/prompt";
+import { selectCardIdentity } from "@/lib/art/card-identity";
 import type { EnrichedGame } from "@/lib/steam/types";
 import { player, noBadges, noAchievements, noRecent } from "./fixtures";
 
@@ -27,7 +28,7 @@ describe("подпись валюты в пользовательском про
 
     const stats = calculateCardStats(profile);
     const rarity = calculateRarity(profile, null);
-    const prompt = buildUserPrompt(profile, stats, rarity);
+    const prompt = buildUserPrompt(profile, stats, rarity, selectCardIdentity(profile, stats, "1"));
 
     expect(prompt).toContain(`${profile.economics.totalLibraryValue}₽`);
     expect(prompt).toContain(`${profile.economics.wastedValue}₽`);
@@ -43,7 +44,7 @@ describe("подпись валюты в пользовательском про
 
     const stats = calculateCardStats(legacyProfile);
     const rarity = calculateRarity(legacyProfile, null);
-    const prompt = buildUserPrompt(legacyProfile, stats, rarity);
+    const prompt = buildUserPrompt(legacyProfile, stats, rarity, selectCardIdentity(legacyProfile, stats, "1"));
 
     expect(prompt).toContain(`$${legacyProfile.economics.totalLibraryValue}`);
     expect(prompt).toContain(`$${legacyProfile.economics.wastedValue}`);

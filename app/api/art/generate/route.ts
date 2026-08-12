@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCache, incrementRateLimit } from "@/lib/cache/redis";
-import { portraitKey, rateLimitKey, CACHE_TTL } from "@/lib/cache/keys";
+import { portraitKey, rateLimitKey, artIdentityKey, CACHE_TTL } from "@/lib/cache/keys";
 import type { CardPortrait } from "@/lib/llm/types";
 import { buildImagePrompt } from "@/lib/art/prompt-builder";
 import { generateArtImage, artFileExists } from "@/lib/art/image-client";
-import type { Element } from "@/lib/art/card-identity";
+import type { CardIdentity } from "@/lib/art/card-identity";
 import { logArtGeneration, logError } from "@/lib/analytics/db";
 import { getClientIp } from "@/lib/http/client-ip";
 import { getAccessLevel } from "@/lib/access/entitlement";
-
-interface CardIdentity {
-  creature: string;
-  element: Element;
-}
 
 export async function POST(req: Request) {
   try {
@@ -33,7 +28,7 @@ export async function POST(req: Request) {
       logArtGeneration({ steamId64, cached: true });
       return NextResponse.json({
         imageUrl: `/api/art/image/${steamId64}`,
-        prompt: portrait ? buildImagePrompt(portrait, "arcane") : "",
+        prompt: portrait ? buildImagePrompt(portrait, "arcane", "neonNight") : "",
         cached: true,
       });
     }
@@ -54,11 +49,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Portrait not found" }, { status: 404 });
     }
 
-    // Get algorithmically selected element (creature now comes from portrait)
-    const identity = await getCache<CardIdentity>(`art:identity:${steamId64}`);
-    const element: Element = identity?.element || "arcane";
-
-    const imagePrompt = buildImagePrompt(portrait, element);
+    // Стихия красит рамку, свет — всю сцену. Оба выбраны при разборе.
+    const identity = await getCache<CardIdentity>(artIdentityKey(steamId64));
+    const imagePrompt = buildImagePrompt(portrait, identity?.element ?? "arcane", identity?.palette ?? "neonNight");
     const result = await generateArtImage(steamId64, imagePrompt);
     logArtGeneration({ steamId64, cached: result.cached });
 

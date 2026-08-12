@@ -5,8 +5,8 @@ import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
 import { persistPurchased } from "@/lib/cache/purchased";
 import { steamIdHasEntitlement } from "@/lib/billing/store";
 import { paywallMode } from "@/lib/access/entitlement";
-import { CACHE_TTL, portraitKey, profileKey, cardStatsKey, rarityKey, rateLimitKey } from "@/lib/cache/keys";
-import { selectCardIdentity } from "@/lib/art/card-identity";
+import { CACHE_TTL, portraitKey, profileKey, cardStatsKey, rarityKey, rateLimitKey, artIdentityKey } from "@/lib/cache/keys";
+import { selectCardIdentity, type CardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
 import { getClientIp } from "@/lib/http/client-ip";
@@ -78,8 +78,17 @@ export async function POST(req: Request) {
     }
 
     // 3. Generate portrait via LLM
+    //
+    // Личность карточки (класс существа, стихия, свет) читается ДО генерации:
+    // класс уезжает в промпт обязательным ограничением. Без него модель
+    // сваливается в свой самый вероятный образ — из пятнадцати духов восемь
+    // выходили грызунами. Раньше эта строка стояла ПОСЛЕ генерации и служила
+    // только аналитике.
+    const cardIdentity = await getCache<CardIdentity>(artIdentityKey(steamId64))
+      || selectCardIdentity(profile, cardStats, steamId64);
+
     const t0 = Date.now();
-    const generated = await generatePortrait(profile, cardStats, rarity, locale);
+    const generated = await generatePortrait(profile, cardStats, rarity, cardIdentity, locale);
     const u = generated.usage;
     const usageNote = u
       ? ` ввод ${u.input} (из кеша ${u.cachedInput}), вывод ${u.output}`
@@ -90,10 +99,6 @@ export async function POST(req: Request) {
 
     // Числа берём свои: модель регулярно перевирает статы, которые ей дали.
     const portrait = applyComputedFacts(generated.portrait, cardStats, rarity);
-
-    // 4. Load card identity (cached during analyze)
-    const cardIdentity = await getCache<{ element: string }>(`art:identity:${steamId64}`)
-      || selectCardIdentity(profile, cardStats, steamId64);
 
     // 5. Cache portrait
     //

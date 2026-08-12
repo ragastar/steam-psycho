@@ -38,6 +38,8 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
+const identity = { creatureClass: "cephalopods", element: "void", palette: "snow" } as const;
+
 describe("мост как основной поставщик", () => {
   it("claude-bridge — допустимое значение настройки", () => {
     process.env.LLM_PROVIDER = "claude-bridge";
@@ -53,7 +55,7 @@ describe("мост как основной поставщик", () => {
     process.env.LLM_PROVIDER = "claude-bridge";
     bridgeMock.mockResolvedValue({ portrait, model: "claude-opus-5" });
 
-    const out = await generatePortrait(profile, cardStats, "rare", "ru");
+    const out = await generatePortrait(profile, cardStats, "rare", identity, "ru");
 
     expect(out.provider).toBe("claude-bridge");
     expect(out.model).toBe("claude-opus-5");
@@ -68,7 +70,7 @@ describe("мост как основной поставщик", () => {
       portrait, model: "claude-opus-5", inputTokens: 10, outputTokens: 20, cachedInputTokens: 0,
     });
 
-    const out = await generatePortrait(profile, cardStats, "rare", "ru");
+    const out = await generatePortrait(profile, cardStats, "rare", identity, "ru");
 
     expect(out.provider).toBe("anthropic");
     expect(anthropicMock).toHaveBeenCalledOnce();
@@ -78,7 +80,7 @@ describe("мост как основной поставщик", () => {
     process.env.LLM_PROVIDER = "claude-bridge";
     bridgeMock.mockRejectedValue(new BridgeUnavailableError("сессия протухла"));
 
-    await expect(generatePortrait(profile, cardStats, "rare", "ru"))
+    await expect(generatePortrait(profile, cardStats, "rare", identity, "ru"))
       .rejects.toBeInstanceOf(BridgeUnavailableError);
   });
 
@@ -87,7 +89,7 @@ describe("мост как основной поставщик", () => {
     process.env.ANTHROPIC_API_KEY = "ключ";
     bridgeMock.mockRejectedValue(new Error("ошибка в коде"));
 
-    await expect(generatePortrait(profile, cardStats, "rare", "ru")).rejects.toThrow("ошибка в коде");
+    await expect(generatePortrait(profile, cardStats, "rare", identity, "ru")).rejects.toThrow("ошибка в коде");
     expect(anthropicMock).not.toHaveBeenCalled();
   });
 });

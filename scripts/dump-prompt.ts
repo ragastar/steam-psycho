@@ -28,6 +28,7 @@ import {
   calculateRarity,
 } from "../lib/aggregation/aggregate";
 import { getSystemPrompt, buildUserPrompt } from "../lib/llm/prompt";
+import { selectCardIdentity } from "../lib/art/card-identity";
 import type { OwnedGame } from "../lib/steam/types";
 
 async function main() {
@@ -70,7 +71,7 @@ async function main() {
   const rarity = calculateRarity(profile, null);
 
   const systemPrompt = getSystemPrompt(locale);
-  const userPrompt = buildUserPrompt(profile, cardStats, rarity);
+  const userPrompt = buildUserPrompt(profile, cardStats, rarity, selectCardIdentity(profile, cardStats, steamId64));
 
   const outDir = path.join(process.cwd(), "tmp", `prompt-${steamId64}`);
   fs.mkdirSync(outDir, { recursive: true });

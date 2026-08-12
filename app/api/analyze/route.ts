@@ -15,7 +15,7 @@ import { buildAggregatedProfile, calculateCardStats, calculateRarity } from "@/l
 import { SteamApiError } from "@/lib/steam/types";
 import type { AchievementGameData, OwnedGame } from "@/lib/steam/types";
 import { getCache, setCache, incrementRateLimit } from "@/lib/cache/redis";
-import { CACHE_TTL, portraitKey, profileKey, rateLimitKey, cardStatsKey, rarityKey } from "@/lib/cache/keys";
+import { CACHE_TTL, portraitKey, profileKey, rateLimitKey, cardStatsKey, rarityKey, artIdentityKey } from "@/lib/cache/keys";
 import { selectCardIdentity } from "@/lib/art/card-identity";
 import { logAnalysis, logError } from "@/lib/analytics/db";
 import { hashIp } from "@/lib/analytics/hash";
@@ -200,7 +200,7 @@ export async function POST(req: Request) {
       setCache(profileKey(steamId64), profile, CACHE_TTL.aggregatedProfile),
       setCache(cardStatsKey(steamId64), cardStats, CACHE_TTL.aggregatedProfile),
       setCache(rarityKey(steamId64), rarity, CACHE_TTL.aggregatedProfile),
-      setCache(`art:identity:${steamId64}`, cardIdentity, CACHE_TTL.portrait),
+      setCache(artIdentityKey(steamId64), cardIdentity, CACHE_TTL.portrait),
     ]);
 
     console.log(`[analyze] ${steamId64} TOTAL: ${Date.now() - t0}ms`);
