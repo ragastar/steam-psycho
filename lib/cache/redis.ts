@@ -95,7 +95,7 @@ function sqliteSet(key: string, value: unknown, ttlSeconds: number): void {
  * каждый push в master) стирал разобранные профили: все, кто в этот момент ждал
  * результат, получали «данные устарели, начните заново».
  */
-const PERSISTENT_PREFIXES = ["gate:", "profile:", "cardstats:", "rarity:", "portrait:", "art:identity:"];
+const PERSISTENT_PREFIXES = ["gate:", "profile:", "cardstats:", "rarity:", "portrait:", "art:identity:", "wealth:"];
 
 function isPersistentKey(key: string): boolean {
   return PERSISTENT_PREFIXES.some((p) => key.startsWith(p));
