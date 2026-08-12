@@ -51,8 +51,9 @@ export interface AggregatedProfile {
     perHourCost: number;
     bestDeal: { name: string; pricePerHour: number } | null;
     freePercentage: number;
-    // Необязательные поля: под ключом profile:v2: лежат вечные записи
-    // покупателей, старые записи без этих полей обязаны продолжать читаться.
+    // Поля необязательные ради типов старых записей в тестах; в живом кеше их
+    // отсутствие означает разбор прежней формы, и такие записи туда больше не
+    // попадают — ключ переехал на profile:v3 (см. lib/cache/keys.ts).
     currency?: "RUB";
     pricedGames?: number;
     estimatedGames?: number;

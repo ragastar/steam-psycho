@@ -25,12 +25,25 @@ export const CACHE_TTL = {
   wealthPartial: 3600,
 } as const;
 
+/**
+ * Версия в ключе — единственный способ выкинуть карточки, написанные по старым
+ * числам. v6: до неё в тексте стояли долларовые суммы из прежней смешанной
+ * базы цен («библиотека на $10416.97» при 157 играх), а карточка покупателя
+ * лежит десять лет и сама бы не обновилась никогда.
+ */
 export function portraitKey(steamId64: string, locale: string): string {
-  return `portrait:v5:${steamId64}:${locale}`;
+  return `portrait:v6:${steamId64}:${locale}`;
 }
 
+/**
+ * v3: у экономики появилась пометка валюты (переход цен на рубли). Записи без
+ * неё читать нельзя — по ним кошелёк не может показать библиотеку и честно
+ * рисует прочерк. Под v2 это стало вечной поломкой: разбор покупателя хранится
+ * десять лет и не пересчитывается сам, так что подпись «появится после
+ * пересчёта» не сбылась бы никогда. Меняется форма разбора — меняется версия.
+ */
 export function profileKey(steamId64: string): string {
-  return `profile:v2:${steamId64}`;
+  return `profile:v3:${steamId64}`;
 }
 
 export function rateLimitKey(ip: string): string {
@@ -77,6 +90,11 @@ export function artImageKey(steamId64: string): string {
   return `art:image:v1:${steamId64}`;
 }
 
+/**
+ * v2: у состояния инвентаря изменился смысл (появилось «часть не пришла», а
+ * «такой игры нет» перестало быть отказом). Старые записи с прежним смыслом
+ * живут у покупателей десять лет и рисовали бы прочерк поверх посчитанных денег.
+ */
 export function wealthKey(steamId64: string): string {
-  return `wealth:v1:${steamId64}`;
+  return `wealth:v2:${steamId64}`;
 }
