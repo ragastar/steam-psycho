@@ -9,6 +9,7 @@ import { StatsGrid } from "./Card/StatsGrid";
 import { ArchetypeBadges } from "./Card/ArchetypeBadges";
 import { RoastsList } from "./Card/RoastsList";
 import { TopGamesCompact } from "./Card/TopGamesCompact";
+import { WealthCard } from "./DeepDive/WealthCard";
 import { EconomicsCard } from "./DeepDive/EconomicsCard";
 import { AchievementsCard } from "./DeepDive/AchievementsCard";
 import { PlatformsBar } from "./DeepDive/PlatformsBar";
@@ -26,6 +27,7 @@ import { SocialTypeCard } from "./PsychoProfile/SocialTypeCard";
 import { FictionalMatchCard } from "./PsychoProfile/FictionalMatchCard";
 import type { CardPortrait, Rarity } from "@/lib/llm/types";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
+import type { Wealth } from "@/lib/wealth/types";
 
 const RARITY_BORDER: Record<Rarity, string> = {
   common: "border-gray-500",
@@ -74,9 +76,11 @@ interface ResultTabsProps {
   locale: string;
   /** Владение проверено на сервере (accountOwnsSteamId) — здесь только рисуем бейдж. */
   isOwner?: boolean;
+  /** Посчитан на сервере ТОЛЬКО при полном доступе (см. страницу результата). */
+  wealth?: Wealth | null;
 }
 
-export function ResultTabs({ portrait, profile, steamId64, locale, isOwner = false }: ResultTabsProps) {
+export function ResultTabs({ portrait, profile, steamId64, locale, isOwner = false, wealth = null }: ResultTabsProps) {
   const t = useTranslations();
   const [activeTab, setActiveTab] = useState("card");
 
@@ -339,6 +343,29 @@ export function ResultTabs({ portrait, profile, steamId64, locale, isOwner = fal
 
           {activeTab === "deepdive" && (
               <div className="space-y-4">
+                {wealth && (
+                  <WealthCard
+                    wealth={wealth}
+                    labels={{
+                      title: t("deepDive.wealth.title"),
+                      accountValue: t("deepDive.wealth.accountValue"),
+                      library: t("deepDive.wealth.library"),
+                      inventory: t("deepDive.wealth.inventory"),
+                      unplayed: t("deepDive.wealth.unplayed"),
+                      perHour: t("deepDive.wealth.perHour"),
+                      avgPrice: t("deepDive.wealth.avgPrice"),
+                      cards: t("deepDive.wealth.cards"),
+                      notable: t("deepDive.wealth.notable"),
+                      unpricedCount: t("deepDive.wealth.unpricedCount"),
+                      unpricedNote: t("deepDive.wealth.unpricedNote"),
+                      marketNote: t("deepDive.wealth.marketNote"),
+                      estimatedNote: t("deepDive.wealth.estimatedNote"),
+                      privateInventory: t("deepDive.wealth.privateInventory"),
+                      inventoryUnavailable: t("deepDive.wealth.inventoryUnavailable"),
+                      storeNote: t("deepDive.wealth.storeNote"),
+                    }}
+                  />
+                )}
                 <EconomicsCard
                   stats={profile.stats}
                   multiplayerRatio={profile.multiplayerRatio}

@@ -12,6 +12,8 @@ import { ResultTabs } from "@/components/ResultTabs";
 import { TeaserPage } from "@/components/TeaserPage";
 import { FreeResult } from "@/components/FreeResult";
 import { getAccessLevel } from "@/lib/access/entitlement";
+import { getWealth } from "@/lib/wealth/store";
+import type { Wealth } from "@/lib/wealth/types";
 import { toTeaserProfile } from "@/lib/access/redact";
 import { toFreePortrait } from "@/lib/access/redact-portrait";
 import { getCurrentAccountId } from "@/lib/identity/session";
@@ -161,6 +163,16 @@ export default async function ResultPage({ params: rawParams, searchParams }: Pr
     );
   }
 
+  // Кошелёк считается только здесь: до этой строки живут те, кто не платил, и
+  // четыре запроса в Steam за инвентарём на каждого из них — прямой путь упереться
+  // в лимит Steam по адресу. Отказ кошелька не должен ронять оплаченную страницу.
+  let wealth: Wealth | null = null;
+  try {
+    wealth = await getWealth(profile, params.id);
+  } catch (err) {
+    console.error("[wealth] расчёт не удался:", err);
+  }
+
   return (
     <div className="min-h-screen">
       {/* Переключатель языка отрисовывает сама панель вкладок: отдельным
@@ -172,6 +184,7 @@ export default async function ResultPage({ params: rawParams, searchParams }: Pr
         steamId64={params.id}
         locale={params.locale}
         isOwner={isOwner}
+        wealth={wealth}
       />
 
       {/* Actions */}

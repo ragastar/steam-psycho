@@ -1,3 +1,5 @@
+import type { PriceSource } from "@/lib/wealth/store-price";
+
 export interface SteamPlayer {
   steamid: string;
   personaname: string;
@@ -29,6 +31,10 @@ export interface EnrichedGame extends OwnedGame {
   price?: number;
   isFree?: boolean;
   averageForever?: number; // global average playtime (minutes)
+  /** Откуда взята цена: российский магазин, американский по курсу, ниоткуда. */
+  priceSource?: PriceSource;
+  /** false — игра из хвоста сверх потолка: цены не спрашивали вовсе. */
+  enriched?: boolean;
 }
 
 export interface PlayerAchievement {

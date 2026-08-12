@@ -17,6 +17,12 @@ export const CACHE_TTL = {
    * действительно доживёт до следующего визита покупателя.
    */
   purchased: 10 * 365 * 24 * 3600, // 10 years
+  /**
+   * Неполный кошелёк: инвентарь закрыт, рынок молчал или курс не пришёл.
+   * Час, а не сутки: настройку приватности человек меняет между визитами, и
+   * запоминать отказ надолго значит врать после того, как он инвентарь открыл.
+   */
+  wealthPartial: 3600,
 } as const;
 
 export function portraitKey(steamId64: string, locale: string): string {
@@ -69,4 +75,8 @@ export function rarityKey(steamId64: string): string {
 
 export function artImageKey(steamId64: string): string {
   return `art:image:v1:${steamId64}`;
+}
+
+export function wealthKey(steamId64: string): string {
+  return `wealth:v1:${steamId64}`;
 }

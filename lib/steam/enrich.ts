@@ -1,8 +1,8 @@
 import type { OwnedGame, EnrichedGame, SteamSpyAppData } from "./types";
 import { cached } from "../cache/redis";
+import { getGamePrice, peekGamePrice } from "@/lib/wealth/store-price";
 
 const STEAMSPY_BASE = "https://steamspy.com/api.php";
-const STORE_BASE = "https://store.steampowered.com/api";
 const DELAY_MS = 300;
 
 /**
@@ -15,6 +15,25 @@ const DELAY_MS = 300;
  * но без цен и тегов — на итоговый портрет это почти не влияет.
  */
 const MAX_ENRICHED = 300;
+
+/**
+ * Потолок НОВЫХ походов в магазин за один разбор — только для второй полосы
+ * (играм после топ-N цену больше неоткуда брать, кроме getGamePrice).
+ *
+ * У store.steampowered.com лимит около 200 запросов за 5 минут на адрес.
+ * Топ-N (30 игр) всегда обогащается полностью — до 2 запросов на игру
+ * (регионы ru/us), то есть до 60. Если вторая полоса на холодном кеше слала
+ * бы столько же походов, сколько игр (до 270 при MAX_ENRICHED=300), лимит
+ * магазина был бы пробит уже на середине разбора — часть цен не пришла бы
+ * вовсе, а заодно пострадали бы чужие разборы с того же сервера.
+ *
+ * Поэтому у второй полосы отдельный бюджет: 60 новых игр × до двух запросов
+ * (ru/us) = 120, плюс топ-N (до 60) — итого меньше двухсот. Игра второй
+ * полосы сначала проверяется через peekGamePrice (кеш, без похода в сеть) —
+ * попадание бюджет не тратит, потому что цена и так уже общая для всех
+ * пользователей и получена бесплатно.
+ */
+const MAX_FRESH_PRICE_LOOKUPS = 60;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,41 +49,6 @@ async function fetchSteamSpyAppData(appId: number): Promise<SteamSpyAppData | nu
       return await res.json();
     } catch {
       return null;
-    }
-  });
-}
-
-/** Parse SteamSpy price string (cents) to dollars */
-function parseSteamSpyPrice(spyData: SteamSpyAppData | null): number | undefined {
-  if (!spyData?.initialprice) return undefined;
-  const cents = parseInt(spyData.initialprice, 10);
-  if (isNaN(cents) || cents <= 0) return undefined;
-  return cents / 100;
-}
-
-interface StoreEnrichResult {
-  genres: string[];
-  price: number | undefined;
-  isFree: boolean;
-}
-
-async function fetchStoreData(appId: number): Promise<StoreEnrichResult> {
-  return cached(`steam:store:${appId}`, 7 * 24 * 3600, async () => {
-    try {
-      const res = await fetch(`${STORE_BASE}/appdetails?appids=${appId}&l=english`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!res.ok) return { genres: [], price: undefined, isFree: false };
-      const data = await res.json();
-      const appData = data[String(appId)];
-      if (!appData?.success) return { genres: [], price: undefined, isFree: false };
-      const genres = appData.data?.genres?.map((g: { description: string }) => g.description) || [];
-      const isFree = appData.data?.is_free === true;
-      const priceData = appData.data?.price_overview;
-      const price = priceData ? priceData.final / 100 : undefined;
-      return { genres, price, isFree };
-    } catch {
-      return { genres: [], price: undefined, isFree: false };
     }
   });
 }
@@ -85,19 +69,21 @@ export async function enrichGames(
     const batch = topGames.slice(i, i + BATCH_SIZE);
     const batchResults = await Promise.all(
       batch.map(async (game) => {
-        const [spyData, storeData] = await Promise.all([
+        // Жанры и цена — из одного и того же похода в магазин (getGamePrice
+        // отдаёт их вместе), отдельный запрос за жанрами не нужен.
+        const [spyData, price] = await Promise.all([
           fetchSteamSpyAppData(game.appid),
-          fetchStoreData(game.appid),
+          getGamePrice(game.appid),
         ]);
         const tags = spyData?.tags || {};
-        const price = storeData.price ?? parseSteamSpyPrice(spyData);
-        const isFree = storeData.isFree || (spyData?.initialprice === "0" && !price);
         return {
           ...game,
           tags,
-          genres: storeData.genres,
-          price,
-          isFree,
+          genres: price.genres,
+          price: price.rub,
+          isFree: price.isFree,
+          priceSource: price.source,
+          enriched: true,
           averageForever: spyData?.average_forever,
         } as EnrichedGame;
       }),
@@ -109,29 +95,49 @@ export async function enrichGames(
     }
   }
 
-  // Remaining games: fetch only SteamSpy for price (no Store API — saves time)
+  // Остальные до потолка: тегов и жанров нет (это привилегия топ-N), а цена —
+  // из того же getGamePrice, что и у топ-игр (единая база), но под бюджетом
+  // MAX_FRESH_PRICE_LOOKUPS: сначала бесплатный peek в кеш, и только если там
+  // пусто и бюджет ещё не исчерпан — настоящий поход в магазин.
+  let freshPriceBudget = MAX_FRESH_PRICE_LOOKUPS;
   const remaining = sorted.slice(topN, MAX_ENRICHED);
   for (let i = 0; i < remaining.length; i += BATCH_SIZE) {
     const batch = remaining.slice(i, i + BATCH_SIZE);
-    const spyResults = await Promise.all(
-      batch.map((game) => fetchSteamSpyAppData(game.appid)),
+    const batchResults = await Promise.all(
+      batch.map(async (game) => {
+        const spyData = await fetchSteamSpyAppData(game.appid);
+
+        let price = await peekGamePrice(game.appid);
+        if (!price && freshPriceBudget > 0) {
+          freshPriceBudget--;
+          price = await getGamePrice(game.appid);
+        }
+
+        if (!price) {
+          // Бюджет исчерпан, а в кеше игры не было — цену не спрашивали
+          // вовсе, как и у хвоста сверх MAX_ENRICHED.
+          return {
+            ...game,
+            tags: {},
+            genres: [],
+            enriched: false,
+            averageForever: spyData?.average_forever,
+          } as EnrichedGame;
+        }
+
+        return {
+          ...game,
+          tags: {},
+          genres: [],
+          price: price.rub,
+          isFree: price.isFree,
+          priceSource: price.source,
+          enriched: true,
+          averageForever: spyData?.average_forever,
+        } as EnrichedGame;
+      }),
     );
-
-    for (let j = 0; j < batch.length; j++) {
-      const game = batch[j];
-      const spyData = spyResults[j];
-      const price = parseSteamSpyPrice(spyData);
-      const isFree = spyData?.initialprice === "0" && !price;
-
-      enriched.push({
-        ...game,
-        tags: {},
-        genres: [],
-        price,
-        isFree,
-        averageForever: spyData?.average_forever,
-      });
-    }
+    enriched.push(...batchResults);
 
     if (i + BATCH_SIZE < remaining.length) {
       await delay(DELAY_MS);
@@ -144,7 +150,7 @@ export async function enrichGames(
   if (skipped.length > 0) {
     console.log(`[enrich] библиотека ${sorted.length} игр: обогащено ${MAX_ENRICHED}, пропущено ${skipped.length}`);
     for (const game of skipped) {
-      enriched.push({ ...game, tags: {}, genres: [] });
+      enriched.push({ ...game, tags: {}, genres: [], enriched: false });
     }
   }
 
