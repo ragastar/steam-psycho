@@ -16,6 +16,8 @@ interface Labels {
   estimatedNote: string;
   privateInventory: string;
   inventoryUnavailable: string;
+  inventoryPartial: string;
+  inventoryOnlyValue: string;
   storeNote: string;
   libraryPending: string;
 }
@@ -28,7 +30,12 @@ export function WealthCard({ wealth, labels }: { wealth: Wealth; labels: Labels 
       <h3 className="text-sm font-semibold text-gray-300">{labels.title}</h3>
 
       <div>
-        <div className="text-xs text-gray-500">{labels.accountValue}</div>
+        {/* Пока библиотека неизвестна, в сумме лежит один инвентарь — и
+            называть её стоимостью аккаунта значит обещать больше, чем в ней
+            есть. Подпись меняется вместе с содержимым. */}
+        <div className="text-xs text-gray-500">
+          {wealth.library ? labels.accountValue : labels.inventoryOnlyValue}
+        </div>
         <div className="text-3xl font-bold font-mono text-emerald-400">{rub(wealth.total)}</div>
       </div>
 
@@ -37,9 +44,15 @@ export function WealthCard({ wealth, labels }: { wealth: Wealth; labels: Labels 
           label={labels.library}
           value={wealth.library ? rub(wealth.library.total) : "—"}
         />
+        {/* Частичный ответ — это посчитанные деньги, просто не все. Прятать их
+            за прочерк нельзя: ровно эта сумма стоит строкой выше, в итоге. */}
         <Stat
           label={labels.inventory}
-          value={wealth.inventory.status === "ok" ? rub(wealth.inventory.total) : "—"}
+          value={
+            wealth.inventory.status === "ok" || wealth.inventory.status === "partial"
+              ? rub(wealth.inventory.total)
+              : "—"
+          }
         />
         {wealth.library && wealth.unplayed && (
           <>
@@ -94,7 +107,12 @@ export function WealthCard({ wealth, labels }: { wealth: Wealth; labels: Labels 
           // подпись не должна утверждать, что оценка была.
           <div>{labels.inventoryUnavailable}</div>
         ) : (
-          <div>{labels.marketNote}</div>
+          <>
+            <div>{labels.marketNote}</div>
+            {/* Показанные деньги настоящие, но итог заведомо занижен —
+                об этом надо сказать, а не делать вид, что посчитано всё. */}
+            {wealth.inventory.status === "partial" && <div>{labels.inventoryPartial}</div>}
+          </>
         )}
         {wealth.library?.estimated && <div>{labels.estimatedNote}</div>}
         {!wealth.library && <div>{labels.libraryPending}</div>}

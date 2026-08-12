@@ -1,7 +1,7 @@
 import type { AggregatedProfile } from "@/lib/aggregation/types";
-import { INVENTORY_APPS, fetchAppInventory } from "@/lib/wealth/inventory";
+import { INVENTORY_APPS, fetchInventories } from "@/lib/wealth/inventory";
 import { getRates } from "@/lib/wealth/fx";
-import type { Wealth, WealthItem } from "@/lib/wealth/types";
+import type { Wealth, WealthInventoryStatus, WealthItem } from "@/lib/wealth/types";
 
 /**
  * Средняя цена карточки в рублях.
@@ -34,9 +34,7 @@ export async function calculateWealth(
   const libraryRub = profile.economics.totalLibraryValue;
   const unplayedRub = profile.economics.wastedValue;
 
-  const inventories = await Promise.all(
-    INVENTORY_APPS.map((app) => fetchAppInventory(steamId64, app.appId, app.contextId)),
-  );
+  const inventories = await fetchInventories(steamId64);
 
   let inventoryRub = 0;
   let itemCount = 0;
@@ -44,17 +42,29 @@ export async function calculateWealth(
   let unpricedItems = 0;
   const items: WealthItem[] = [];
   const notable: string[] = [];
-  let status = inventories[0].status;
+  // Отвечают ли приложения деньгами и сколько из них отказали. Считать «худший
+  // ответ побеждает» нельзя: у человека без TF2 один ответ «такой игры нет»
+  // прятал за прочерком инвентарь CS2, Dota и карточек, который в это же время
+  // уже был посчитан и показан в итоговой строке.
+  let answered = 0;
+  let refused = 0;
+  let anyPrivate = false;
 
-  for (let i = 0; i < inventories.length; i++) {
-    const inv = inventories[i];
-    const app = INVENTORY_APPS[i];
+  for (const inv of inventories) {
+    // Приложение ищем по номеру, а не по месту в списке: порядок ответов —
+    // внутреннее дело обхода, а цена ошибки здесь в том, что деньги за скины
+    // посчитались бы по правилам карточек.
+    const app = INVENTORY_APPS.find((a) => a.appId === inv.appId);
+    if (!app) continue;
     itemCount += inv.itemCount;
+    // Игры у человека нет — за этим ответом не стоит ни денег, ни отказа.
+    if (inv.status === "missing") continue;
     if (inv.status !== "ok") {
-      // Худший исход побеждает: закрытый инвентарь важнее удачного соседа.
-      if (status === "ok") status = inv.status;
+      refused++;
+      if (inv.status === "private") anyPrivate = true;
       continue;
     }
+    answered++;
     if (app.priced) {
       inventoryRub += inv.totalEur * eurRub;
       for (const item of inv.items) {
@@ -78,6 +88,19 @@ export async function calculateWealth(
   // Топ — по стоимости всей стопки, а не по цене штуки: двадцать копий по рублю
   // дороже одного ножа за пятнадцать, хоть штучно и дешевле.
   const top = items.sort((a, b) => b.totalRub - a.totalRub).slice(0, TOP_ITEMS);
+
+  // Ни одно приложение не ответило данными. Пустым инвентарь при этом не
+  // объявляем даже когда все ответы — «такой игры нет»: контекст карточек (753)
+  // есть у любого аккаунта, и его молчание означает что угодно, кроме нуля.
+  const status: WealthInventoryStatus =
+    answered === 0
+      ? anyPrivate
+        ? "private"
+        : "unavailable"
+      : refused > 0
+        ? "partial"
+        : "ok";
+
   const totalGames = profile.stats.totalGames || 1;
   const totalHours = profile.stats.totalPlaytimeHours || 1;
 

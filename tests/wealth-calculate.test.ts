@@ -1,13 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import type { AggregatedProfile } from "@/lib/aggregation/types";
 
 vi.mock("@/lib/wealth/fx", () => ({ getRates: async () => ({ usdRub: 80, eurRub: 100 }), FX_TTL: 1 }));
-vi.mock("@/lib/wealth/inventory", () => ({
-  INVENTORY_APPS: [
+vi.mock("@/lib/wealth/inventory", () => {
+  const INVENTORY_APPS = [
     { appId: 730, contextId: 2, priced: true },
     { appId: 753, contextId: 6, priced: false },
-  ],
-  fetchAppInventory: async (_id: string, appId: number) =>
+  ];
+  const fetchAppInventory = async (_id: string, appId: number) =>
     appId === 730
       ? {
           appId,
@@ -20,8 +20,14 @@ vi.mock("@/lib/wealth/inventory", () => ({
             { name: "10 Year Veteran Coin", qty: 1, marketable: false },
           ],
         }
-      : { appId, status: "ok", totalEur: 0, itemCount: 10, items: [] },
-}));
+      : { appId, status: "ok", totalEur: 0, itemCount: 10, items: [] };
+  return {
+    INVENTORY_APPS,
+    fetchAppInventory,
+    fetchInventories: async (id: string) =>
+      Promise.all(INVENTORY_APPS.map((a) => fetchAppInventory(id, a.appId))),
+  };
+});
 
 function profile(overrides: Partial<AggregatedProfile["economics"]> = {}): AggregatedProfile {
   return {
@@ -76,10 +82,15 @@ describe("сборщик кошелька", () => {
   });
 
   it("закрытый инвентарь делает расчёт неполным, но не пустым", async () => {
-    vi.doMock("@/lib/wealth/inventory", () => ({
-      INVENTORY_APPS: [{ appId: 730, contextId: 2, priced: true }],
-      fetchAppInventory: async () => ({ appId: 730, status: "private", totalEur: 0, itemCount: 0, items: [] }),
-    }));
+    vi.doMock("@/lib/wealth/inventory", () => {
+      const INVENTORY_APPS = [{ appId: 730, contextId: 2, priced: true }];
+      const fetchAppInventory = async () => ({ appId: 730, status: "private", totalEur: 0, itemCount: 0, items: [] });
+      return {
+        INVENTORY_APPS,
+        fetchAppInventory,
+        fetchInventories: async () => Promise.all(INVENTORY_APPS.map(() => fetchAppInventory())),
+      };
+    });
     vi.resetModules();
     const { calculateWealth } = await import("@/lib/wealth/calculate");
     const wealth = await calculateWealth(profile(), "1");
@@ -91,9 +102,9 @@ describe("сборщик кошелька", () => {
   });
 
   it("стопка дешёвых копий обгоняет дорогую поштучно вещь, если стоит дороже в сумме", async () => {
-    vi.doMock("@/lib/wealth/inventory", () => ({
-      INVENTORY_APPS: [{ appId: 730, contextId: 2, priced: true }],
-      fetchAppInventory: async () => ({
+    vi.doMock("@/lib/wealth/inventory", () => {
+      const INVENTORY_APPS = [{ appId: 730, contextId: 2, priced: true }];
+      const fetchAppInventory = async () => ({
         appId: 730,
         status: "ok",
         totalEur: 0.35,
@@ -104,8 +115,13 @@ describe("сборщик кошелька", () => {
           // 1 копия по 15 ₽ — штучно дороже, но стопкой дешевле
           { name: "Нож", qty: 1, priceEur: 0.15, marketable: true },
         ],
-      }),
-    }));
+      });
+      return {
+        INVENTORY_APPS,
+        fetchAppInventory,
+        fetchInventories: async () => Promise.all(INVENTORY_APPS.map(() => fetchAppInventory())),
+      };
+    });
     vi.resetModules();
     const { calculateWealth } = await import("@/lib/wealth/calculate");
     const wealth = await calculateWealth(profile(), "1");
@@ -122,9 +138,9 @@ describe("сборщик кошелька", () => {
   });
 
   it("выставляемый предмет без цены в прайс-листе не пропадает молча", async () => {
-    vi.doMock("@/lib/wealth/inventory", () => ({
-      INVENTORY_APPS: [{ appId: 730, contextId: 2, priced: true }],
-      fetchAppInventory: async () => ({
+    vi.doMock("@/lib/wealth/inventory", () => {
+      const INVENTORY_APPS = [{ appId: 730, contextId: 2, priced: true }];
+      const fetchAppInventory = async () => ({
         appId: 730,
         status: "ok",
         totalEur: 15,
@@ -134,8 +150,13 @@ describe("сборщик кошелька", () => {
           // Выставляемый, но рынок цену не знает — не должен пропасть с витрины
           { name: "Загадочный шеврон", qty: 3, marketable: true },
         ],
-      }),
-    }));
+      });
+      return {
+        INVENTORY_APPS,
+        fetchAppInventory,
+        fetchInventories: async () => Promise.all(INVENTORY_APPS.map(() => fetchAppInventory())),
+      };
+    });
     vi.resetModules();
     const { calculateWealth } = await import("@/lib/wealth/calculate");
     const wealth = await calculateWealth(profile(), "1");
@@ -148,5 +169,98 @@ describe("сборщик кошелька", () => {
 
     vi.doUnmock("@/lib/wealth/inventory");
     vi.resetModules();
+  });
+});
+
+describe("частичный ответ Steam", () => {
+  /** Мок из нескольких приложений с заданными исходами. */
+  function mockApps(cases: { appId: number; status: string; priced?: boolean }[]) {
+    vi.doMock("@/lib/wealth/inventory", () => {
+      const INVENTORY_APPS = cases.map((c) => ({
+        appId: c.appId,
+        contextId: 2,
+        priced: c.priced !== false,
+      }));
+      const fetchAppInventory = async (_id: string, appId: number) => {
+        const found = cases.find((c) => c.appId === appId)!;
+        return found.status === "ok"
+          ? {
+              appId,
+              status: "ok",
+              totalEur: 10,
+              itemCount: 2,
+              items: [{ name: `Вещь ${appId}`, qty: 1, priceEur: 10, marketable: true }],
+            }
+          : { appId, status: found.status, totalEur: 0, itemCount: 0, items: [] };
+      };
+      return {
+        INVENTORY_APPS,
+        fetchAppInventory,
+        fetchInventories: async (id: string) =>
+          Promise.all(INVENTORY_APPS.map((a) => fetchAppInventory(id, a.appId))),
+      };
+    });
+    vi.resetModules();
+  }
+
+  afterEach(() => {
+    vi.doUnmock("@/lib/wealth/inventory");
+    vi.resetModules();
+  });
+
+  it("игра, которой у человека нет, не отменяет посчитанные деньги", async () => {
+    // Живой случай 76561198140642959: CS2 и карточки отдались, TF2 у человека
+    // нет вовсе. Прежде этот один ответ делал весь инвентарь «недоступным»,
+    // хотя деньги по остальным уже лежали в сумме.
+    mockApps([
+      { appId: 730, status: "ok" },
+      { appId: 440, status: "missing" },
+    ]);
+    const { calculateWealth } = await import("@/lib/wealth/calculate");
+    const wealth = await calculateWealth(profile(), "1");
+
+    expect(wealth.inventory.status).toBe("ok");
+    expect(wealth.inventory.total).toBeCloseTo(1000, 2);
+    expect(wealth.complete).toBe(true);
+  });
+
+  it("отказ по одной игре показывает деньги и честно зовётся неполным", async () => {
+    mockApps([
+      { appId: 730, status: "ok" },
+      { appId: 570, status: "throttled" },
+    ]);
+    const { calculateWealth } = await import("@/lib/wealth/calculate");
+    const wealth = await calculateWealth(profile(), "1");
+
+    expect(wealth.inventory.status).toBe("partial");
+    // Деньги, которые Steam всё-таки отдал, обязаны остаться и в инвентаре, и в итоге
+    expect(wealth.inventory.total).toBeCloseTo(1000, 2);
+    expect(wealth.total).toBeCloseTo(200000 + 1000, 2);
+    expect(wealth.complete).toBe(false);
+  });
+
+  it("закрытая часть при открытой остальной — тоже неполный ответ, а не «закрыт»", async () => {
+    mockApps([
+      { appId: 730, status: "ok" },
+      { appId: 570, status: "private" },
+    ]);
+    const { calculateWealth } = await import("@/lib/wealth/calculate");
+    const wealth = await calculateWealth(profile(), "1");
+
+    expect(wealth.inventory.status).toBe("partial");
+  });
+
+  it("если не отдалось ничего, инвентарь не объявляется пустым", async () => {
+    // Контекст карточек (753) есть у любого аккаунта. Раз молчит и он —
+    // утверждать «инвентарь на 0 ₽» нельзя.
+    mockApps([
+      { appId: 730, status: "missing" },
+      { appId: 753, status: "missing", priced: false },
+    ]);
+    const { calculateWealth } = await import("@/lib/wealth/calculate");
+    const wealth = await calculateWealth(profile(), "1");
+
+    expect(wealth.inventory.status).toBe("unavailable");
+    expect(wealth.complete).toBe(false);
   });
 });

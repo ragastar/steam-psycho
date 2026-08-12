@@ -49,6 +49,8 @@ const labels = {
   inventoryUnavailable: "UNAVAILABLE_MARKER",
   storeNote: "SN",
   libraryPending: "LIBRARY_PENDING_MARKER",
+  inventoryPartial: "PARTIAL_MARKER",
+  inventoryOnlyValue: "INVENTORY_ONLY_MARKER",
 };
 
 describe("витрина кошелька", () => {
@@ -75,7 +77,8 @@ describe("витрина кошелька", () => {
       const wealth = (messages as Record<string, Record<string, unknown>>).deepDive.wealth as Record<string, string>;
       for (const key of ["title", "library", "inventory", "unplayed", "perHour", "avgPrice",
                          "marketNote", "estimatedNote", "privateInventory", "cards",
-                         "unpricedCount", "unpricedNote", "inventoryUnavailable", "libraryPending"]) {
+                         "unpricedCount", "unpricedNote", "inventoryUnavailable", "libraryPending",
+                         "inventoryPartial", "inventoryOnlyValue"]) {
         expect(wealth[key]).toBeTruthy();
       }
     }
@@ -107,6 +110,26 @@ describe("витрина кошелька", () => {
     expect(html).toContain("LIBRARY_PENDING_MARKER");
     expect(html).not.toContain("PH");
     expect(html).not.toContain("AP");
+  });
+
+  it("часть инвентаря не пришла — деньги показываем, о недоборе говорим", () => {
+    // Живой случай: CS2 и карточки отдались, ещё одна игра нет. Прежде число
+    // пряталось за прочерк, хотя те же деньги стояли в итоговой строке.
+    const wealth = makeWealth("partial");
+    wealth.inventory.total = 7761;
+    const html = renderToStaticMarkup(createElement(WealthCard, { wealth, labels }));
+    expect(html).toContain("PARTIAL_MARKER");
+    expect(html).toContain("7\u00a0761");
+    expect(html).not.toContain("UNAVAILABLE_MARKER");
+  });
+
+  it("без библиотеки крупная цифра не выдаёт себя за стоимость аккаунта", () => {
+    // Пока библиотека неизвестна, итог — это только инвентарь. Подпись
+    // «Стоимость аккаунта» над ним обещает больше, чем в нём есть.
+    const wealth = { ...makeWealth("ok"), library: null, unplayed: null };
+    const html = renderToStaticMarkup(createElement(WealthCard, { wealth, labels }));
+    expect(html).toContain("INVENTORY_ONLY_MARKER");
+    expect(html).not.toContain(">AV<");
   });
 
   it("доступный инвентарь получает рыночную подпись", () => {

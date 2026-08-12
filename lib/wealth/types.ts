@@ -1,4 +1,15 @@
-import type { InventoryStatus } from "@/lib/wealth/inventory";
+/**
+ * Итог по всему инвентарю, а не по одной игре (за приложениями — `InventoryStatus`).
+ *
+ * `partial` — часть игр Steam отдал, часть нет: деньги по отданной части
+ * посчитаны и показываются, но итог заведомо занижен. Отдельное состояние
+ * появилось потому, что прежде худший ответ из четырёх становился общим: один
+ * отказ прятал уже посчитанную сумму за прочерк, хотя в итоговую строку она
+ * при этом входила.
+ *
+ * Игра, которой у человека нет, состоянием не считается вовсе — это не отказ.
+ */
+export type WealthInventoryStatus = "ok" | "partial" | "private" | "unavailable";
 
 export interface WealthItem {
   name: string;
@@ -32,7 +43,7 @@ export interface Wealth {
     value: number;
   } | null;
   inventory: {
-    status: InventoryStatus;
+    status: WealthInventoryStatus;
     total: number;
     itemCount: number;
     top: WealthItem[];

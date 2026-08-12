@@ -95,6 +95,8 @@
       "estimatedNote": "Part of the total is estimated from the average price",
       "privateInventory": "Inventory is private",
       "inventoryUnavailable": "Couldn't fetch the inventory — Steam didn't respond, we'll try again later",
+      "inventoryPartial": "Steam didn't return part of the inventory — that money isn't in the total",
+      "inventoryOnlyValue": "Inventory value",
       "storeNote": "Steam prices for Russia, today",
       "libraryPending": "Library value will appear once the analysis is recalculated — the previous run used a different currency"
     },
