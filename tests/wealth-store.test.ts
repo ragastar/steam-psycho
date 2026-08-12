@@ -65,4 +65,23 @@ describe("хранение кошелька", () => {
     await getWealth(profile, "77");
     expect(cache.get(wealthKey("77"))?.ttl).toBe(CACHE_TTL.wealthPartial);
   });
+
+  it("неполный расчёт при включённой кассе не ходит в БД — итог заранее известен", async () => {
+    calculateWealth.mockResolvedValue(wealth(false));
+    const { getWealth } = await import("@/lib/wealth/store");
+    const { CACHE_TTL, wealthKey } = await import("@/lib/cache/keys");
+    await getWealth(profile, "77");
+    expect(cache.get(wealthKey("77"))?.ttl).toBe(CACHE_TTL.wealthPartial);
+    expect(hasEntitlement).not.toHaveBeenCalled();
+  });
+
+  it("неполный расчёт при выключенной кассе хранит час, в БД не ходим", async () => {
+    mode.mockReturnValue("off");
+    calculateWealth.mockResolvedValue(wealth(false));
+    const { getWealth } = await import("@/lib/wealth/store");
+    const { CACHE_TTL, wealthKey } = await import("@/lib/cache/keys");
+    await getWealth(profile, "77");
+    expect(cache.get(wealthKey("77"))?.ttl).toBe(CACHE_TTL.wealthPartial);
+    expect(hasEntitlement).not.toHaveBeenCalled();
+  });
 });

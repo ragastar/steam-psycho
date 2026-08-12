@@ -9,6 +9,9 @@ import type { Wealth } from "@/lib/wealth/types";
 /**
  * Кошелёк из кеша, а если его там нет — счёт и запись.
  *
+ * Неполный расчёт имеет предопределённый срок (час), и право ни на что не влияет.
+ * Проверяем это сначала, чтобы не открывать SQLite зря.
+ *
  * Режим спрашивается ПЕРЕД базой заказов: при `PAYWALL_MODE=off` заказов не
  * существует, а обращение к store открыло бы SQLite и прогнало миграцию таблиц
  * оплаты на каждый показ страницы.
@@ -20,15 +23,12 @@ export async function getWealth(profile: AggregatedProfile, steamId64: string): 
 
   const wealth = await calculateWealth(profile, steamId64);
 
-  // Режим спрашивается ДО базы заказов, чтобы не открывать SQLite впустую
-  let purchased = false;
-  if (paywallMode() !== "off") {
-    purchased = steamIdHasEntitlement(steamId64);
-  }
-
+  // Неполный расчёт (инвентарь закрыт, рынок молчит или курс не пришёл) имеет
+  // предопределённый срок час, и право ни на что не влияет. Проверяем это сначала,
+  // чтобы не открывать SQLite зря — когда касса включена, это целевой сценарий.
   const ttl = !wealth.complete
     ? CACHE_TTL.wealthPartial
-    : purchased
+    : paywallMode() !== "off" && steamIdHasEntitlement(steamId64)
       ? CACHE_TTL.purchased
       : CACHE_TTL.aggregatedProfile;
 
