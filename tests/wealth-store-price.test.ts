@@ -2,8 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const fetchSpy = vi.fn();
 vi.stubGlobal("fetch", fetchSpy);
+
+// cached() остаётся чистым сквозным вызовом — как и раньше, тесты цены не
+// зависят от того, что реально осядет в кеше. getCache — отдельная ручная
+// подложка: peekGamePrice читает из неё, и тесты сами кладут туда то, что
+// хотят увидеть «уже посчитанным», не трогая cached().
+const { fakeCache } = vi.hoisted(() => ({ fakeCache: new Map<string, unknown>() }));
 vi.mock("@/lib/cache/redis", () => ({
   cached: async (_k: string, _t: number, fetcher: () => Promise<unknown>) => fetcher(),
+  getCache: async (k: string) => (fakeCache.has(k) ? fakeCache.get(k) : null),
 }));
 vi.mock("@/lib/wealth/fx", () => ({
   getRates: async () => ({ usdRub: 80, eurRub: 95 }),
@@ -14,7 +21,10 @@ function storeResponse(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200 });
 }
 
-beforeEach(() => fetchSpy.mockReset());
+beforeEach(() => {
+  fetchSpy.mockReset();
+  fakeCache.clear();
+});
 
 describe("цена игры", () => {
   it("берёт российскую цену как есть", async () => {
@@ -86,5 +96,20 @@ describe("цена игры", () => {
     const { getGamePrice } = await import("@/lib/wealth/store-price");
     const result = await getGamePrice(10);
     expect(result.genres).toEqual(["RPG"]);
+  });
+});
+
+describe("peekGamePrice — заглянуть в кеш, не ходя в магазин", () => {
+  it("отдаёт уже посчитанную цену из кеша и не трогает сеть", async () => {
+    fakeCache.set("gameprice:v1:570", { rub: 999, isFree: false, source: "ru", genres: ["Action"] });
+    const { peekGamePrice } = await import("@/lib/wealth/store-price");
+    expect(await peekGamePrice(570)).toEqual({ rub: 999, isFree: false, source: "ru", genres: ["Action"] });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("при промахе кеша отдаёт null и тоже не ходит в сеть", async () => {
+    const { peekGamePrice } = await import("@/lib/wealth/store-price");
+    expect(await peekGamePrice(999999)).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

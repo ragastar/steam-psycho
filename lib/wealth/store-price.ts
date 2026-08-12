@@ -1,4 +1,4 @@
-import { cached } from "@/lib/cache/redis";
+import { cached, getCache } from "@/lib/cache/redis";
 import { getRates } from "@/lib/wealth/fx";
 
 const STORE_URL = "https://store.steampowered.com/api/appdetails";
@@ -48,16 +48,7 @@ async function fetchRegion(appId: number, cc: "ru" | "us"): Promise<RegionPrice 
   });
 }
 
-/**
- * Сколько игра стоит в рублях сейчас (и заодно — какие у неё жанры).
- *
- * Сначала российский магазин: там настоящая цена со скидками. Игра, которой в
- * РФ нет, добирается американской ценой по курсу — иначе половина библиотеки у
- * человека молча превратилась бы в ноль. Жанры едут в том же ответе: если РФ
- * не дала цены и код всё равно пошёл в US, оттуда же берутся и они —
- * специально второй раз в магазин за жанрами ходить незачем.
- */
-export async function getGamePrice(appId: number): Promise<GamePrice> {
+async function fetchGamePrice(appId: number): Promise<GamePrice> {
   const ru = await fetchRegion(appId, "ru");
   const ruGenres = ru?.genres ?? [];
   if (ru?.isFree) return { isFree: true, source: "none", genres: ruGenres };
@@ -79,4 +70,37 @@ export async function getGamePrice(appId: number): Promise<GamePrice> {
   }
 
   return { isFree: false, source: "none", genres };
+}
+
+function gamePriceCacheKey(appId: number): string {
+  return `gameprice:v1:${appId}`;
+}
+
+/**
+ * Сколько игра стоит в рублях сейчас (и заодно — какие у неё жанры).
+ *
+ * Сначала российский магазин: там настоящая цена со скидками. Игра, которой в
+ * РФ нет, добирается американской ценой по курсу — иначе половина библиотеки у
+ * человека молча превратилась бы в ноль. Жанры едут в том же ответе: если РФ
+ * не дала цены и код всё равно пошёл в US, оттуда же берутся и они —
+ * специально второй раз в магазин за жанрами ходить незачем.
+ *
+ * Готовый результат кешируется отдельно от сырых региональных ответов (ключ
+ * `gameprice:v1:{appId}`, тот же срок) — это и экономит поход в кеш дважды
+ * (ru+us) при повторном разборе той же игры, и даёт `peekGamePrice`
+ * единственное место, куда заглянуть за уже посчитанной ценой.
+ */
+export async function getGamePrice(appId: number): Promise<GamePrice> {
+  return cached(gamePriceCacheKey(appId), STORE_PRICE_TTL, () => fetchGamePrice(appId));
+}
+
+/**
+ * Заглянуть в кеш готовых цен, не ходя в магазин вовсе.
+ *
+ * Нужна бюджету обогащения (`lib/steam/enrich.ts`): библиотеку с уже
+ * посчитанной игрой (кеш общий и живёт неделю) можно ценить бесплатно, а
+ * бюджет новых походов в магазин тратить только на то, чего в кеше правда нет.
+ */
+export async function peekGamePrice(appId: number): Promise<GamePrice | null> {
+  return getCache<GamePrice>(gamePriceCacheKey(appId));
 }
