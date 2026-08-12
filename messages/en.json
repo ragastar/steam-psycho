@@ -79,6 +79,23 @@
     }
   },
   "deepDive": {
+    "wealth": {
+      "title": "Wallet",
+      "accountValue": "Account value",
+      "library": "Library",
+      "inventory": "Inventory",
+      "unplayed": "Money in unplayed games",
+      "perHour": "Cost per hour",
+      "avgPrice": "Average game price",
+      "cards": "Cards and emoticons",
+      "notable": "Notable items",
+      "unpricedCount": "Not priced by market",
+      "unpricedNote": "The market doesn't know these items by name — their value isn't in the total",
+      "marketNote": "Inventory is valued at quick-sale prices on a third-party market; inside Steam these items cost about a quarter more",
+      "estimatedNote": "Part of the total is estimated from the average price",
+      "privateInventory": "Inventory is private",
+      "storeNote": "Steam prices for Russia, today"
+    },
     "economics": {
       "title": "Library Overview",
       "played": "Played",
