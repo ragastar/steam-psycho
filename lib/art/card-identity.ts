@@ -1,32 +1,95 @@
 import type { AggregatedProfile } from "../aggregation/types";
 import type { CardStats } from "../aggregation/aggregate";
 
-export type Creature =
-  | "phoenix" | "dragon" | "fox" | "wraith" | "owl" | "wolf"
-  | "serpent" | "griffin" | "raven" | "bear" | "tiger" | "stag"
-  | "kraken" | "chimera" | "sphinx" | "hydra" | "falcon" | "panther";
+/**
+ * Класс существа, а не конкретный зверь.
+ *
+ * Конкретику придумывает модель — но внутри класса, который выбрал код. Без
+ * этого ограничения она уходит в свой самый вероятный образ: из пятнадцати
+ * выданных духов восемь оказались грызунами и норными, три из них — хомяк в
+ * колесе, а два медоеда подряд повторяли друг друга дословно.
+ */
+export type CreatureClass =
+  | "birds" | "deepSea" | "insects" | "reptiles" | "hoofed" | "bigCats"
+  | "primates" | "livestock" | "cephalopods" | "crustaceans"
+  | "prehistoric" | "mythic" | "mustelids" | "rodents";
+
+export const CREATURE_CLASS_HINTS: Record<CreatureClass, string> = {
+  birds: "a bird — owl, pelican, crow, ostrich, penguin, vulture, heron",
+  deepSea: "a deep-sea creature — anglerfish, blobfish, sperm whale, moray eel",
+  insects: "an insect or arachnid — dung beetle, mantis, tarantula, moth, ant",
+  reptiles: "a reptile or amphibian — iguana, gecko, crocodile, axolotl, toad",
+  hoofed: "a hoofed animal — goat, moose, donkey, camel, bull, tapir",
+  bigCats: "a large predator — tiger, lynx, wolf, hyena, snow leopard",
+  primates: "a primate — orangutan, baboon, lemur, gorilla, macaque",
+  livestock: "farm livestock — pig, sheep, rooster, cow, turkey, goose",
+  cephalopods: "a cephalopod — octopus, squid, cuttlefish, nautilus",
+  crustaceans: "a crustacean — crab, lobster, mantis shrimp, barnacle",
+  prehistoric: "a prehistoric beast — dinosaur, mammoth, trilobite, sabertooth",
+  mythic: "a mythical creature — dragon, griffin, kraken, chimera, golem",
+  mustelids: "a mustelid or bear — badger, otter, wolverine, raccoon, brown bear",
+  rodents: "a rodent or burrower — capybara, mole, beaver, porcupine, marmot",
+};
 
 export type Element =
   | "fire" | "ice" | "shadow" | "nature" | "arcane"
   | "storm" | "void" | "iron" | "blood" | "crystal";
 
-interface CardIdentity {
-  creature: Creature;
-  element: Element;
-}
-
-// --- Creature selection based on dominant stat + secondary ---
-
-const STAT_CREATURES: Record<string, Creature[]> = {
-  dedication: ["phoenix", "bear", "stag", "wolf", "tiger"],
-  mastery: ["dragon", "tiger", "falcon", "phoenix", "panther"],
-  exploration: ["fox", "griffin", "chimera", "raven", "sphinx"],
-  hoarding: ["wraith", "serpent", "hydra", "kraken", "owl"],
-  social: ["wolf", "kraken", "panther", "griffin", "fox"],
-  veteran: ["owl", "sphinx", "raven", "stag", "dragon"],
+/**
+ * У каждой черты свой пул классов; вместе они покрывают все четырнадцать.
+ *
+ * Пул нужен, чтобы связь «человек → зверь» осталась осмысленной, а выбор
+ * внутри пула по хешу — чтобы двое с одинаковой выделяющейся чертой не
+ * получили одинаковую карточку.
+ */
+const TRAIT_CLASSES: Record<keyof CardStats, CreatureClass[]> = {
+  dedication: ["hoofed", "livestock", "rodents"],
+  mastery: ["bigCats", "birds", "mythic"],
+  exploration: ["cephalopods", "deepSea", "prehistoric"],
+  hoarding: ["crustaceans", "insects", "mustelids"],
+  social: ["primates", "livestock", "birds"],
+  veteran: ["reptiles", "prehistoric", "mythic"],
 };
 
-// --- Deterministic hash for creature variation ---
+/**
+ * Средние по чертам среди прошедших разбор (замер 2026-08-12, n=29).
+ *
+ * Сравнивать надо именно с ними: абсолютная величина не отличает никого.
+ * Упорство доминировало у 26 человек из 29 при среднем 86 из 100 — кто дошёл
+ * до сайта, тот и так задрот, и класс существа у всех получался бы один.
+ */
+const TRAIT_BASELINE: Record<keyof CardStats, number> = {
+  dedication: 86.4,
+  mastery: 66.9,
+  exploration: 56.0,
+  hoarding: 33.8,
+  social: 47.3,
+  veteran: 65.7,
+};
+
+/** Свет и палитра сцены — отдельная ось, иначе все карточки одинаково тёмные. */
+export type Palette =
+  | "dawn" | "noon" | "storm" | "neonNight"
+  | "snow" | "underwater" | "desertHeat" | "autumnDusk";
+
+export const PALETTE_HINTS: Record<Palette, string> = {
+  dawn: "cold pink-and-gold dawn light, long soft shadows, clear air",
+  noon: "bright clear midday sun, high contrast, saturated colors",
+  storm: "thunderstorm light, heavy grey clouds, lightning rim-light",
+  neonNight: "neon night, magenta and cyan glow, wet reflective surfaces",
+  snow: "whiteout snowfall, pale blue light, frost haze",
+  underwater: "underwater light shafts, deep teal water, floating particles",
+  desertHeat: "desert noon haze, ochre and burnt orange, heat shimmer",
+  autumnDusk: "autumn dusk, amber and rust tones, low warm sun",
+};
+
+const PALETTES = Object.keys(PALETTE_HINTS) as Palette[];
+
+export interface CardIdentity {
+  creatureClass: CreatureClass;
+  element: Element;
+  palette: Palette;
+}
 
 function hashCode(str: string): number {
   let hash = 0;
@@ -37,94 +100,85 @@ function hashCode(str: string): number {
   return Math.abs(hash);
 }
 
-// --- Element selection based on top genres/tags ---
+/**
+ * Черта, по которой человек сильнее всего непохож на остальных.
+ *
+ * Отклонение относительное, а не разница в очках: барахольщик с 60 при типичных
+ * 34 выделяется сильнее, чем упорный с 95 при типичных 86, хотя в очках второй
+ * дальше от нуля. Берётся модуль — провал по черте говорит о человеке столько
+ * же, сколько всплеск.
+ */
+export function mostDistinctiveTrait(stats: CardStats): keyof CardStats {
+  let best: keyof CardStats = "dedication";
+  let bestDeviation = -1;
+  for (const key of Object.keys(TRAIT_BASELINE) as (keyof CardStats)[]) {
+    const deviation = Math.abs((stats[key] - TRAIT_BASELINE[key]) / TRAIT_BASELINE[key]);
+    if (deviation > bestDeviation) {
+      bestDeviation = deviation;
+      best = key;
+    }
+  }
+  return best;
+}
 
-const GENRE_ELEMENTS: [RegExp, Element][] = [
-  [/shooter|fps|action/i, "fire"],
-  [/strategy|tactical|tower defense|4x/i, "ice"],
-  [/horror|stealth|noir|dark/i, "shadow"],
-  [/rpg|survival|open world|adventure/i, "nature"],
-  [/puzzle|indie|roguelike|platformer/i, "arcane"],
-  [/racing|sports|fighting/i, "storm"],
-  [/space|sci-fi|cyberpunk/i, "void"],
-  [/simulation|management|building/i, "iron"],
-  [/souls-like|difficult|hardcore/i, "blood"],
-  [/relaxing|casual|visual novel|anime/i, "crystal"],
+/**
+ * Типичная доля темы среди прошедших разбор (замер 2026-08-12 по четырём
+ * профилям — пересмотреть, когда наберётся выборка).
+ *
+ * Сравнение именно с ней, а не выбор самой частой темы: шутеры и RPG есть у
+ * каждого, поэтому огонь и природа выигрывали почти всегда и из десяти стихий
+ * встречались три.
+ */
+const ELEMENT_THEMES: { element: Element; pattern: RegExp; baseline: number }[] = [
+  { element: "fire", pattern: /shooter|fps|action/i, baseline: 40 },
+  { element: "ice", pattern: /strategy|tactical|tower defense|4x/i, baseline: 21 },
+  { element: "shadow", pattern: /horror|stealth|noir|dark/i, baseline: 0 },
+  { element: "nature", pattern: /rpg|survival|open world|adventure/i, baseline: 26 },
+  { element: "arcane", pattern: /puzzle|roguelike|platformer/i, baseline: 0 },
+  { element: "storm", pattern: /racing|sports|fighting/i, baseline: 2 },
+  { element: "void", pattern: /space|sci-?fi|cyberpunk/i, baseline: 1 },
+  { element: "iron", pattern: /simulation|management|building|automation/i, baseline: 4 },
+  { element: "blood", pattern: /souls-?like|difficult|hardcore|gore/i, baseline: 1 },
+  { element: "crystal", pattern: /relaxing|casual|visual novel|anime|cute/i, baseline: 1 },
 ];
+
+/** Ниже этого превышения тема не считается выделяющейся. */
+const MIN_EXCESS = 3;
+
+function selectElement(profile: AggregatedProfile): Element {
+  const shares: [string, number][] = [
+    ...(profile.genreDistribution ?? []).map((g) => [g.genre, g.percentage] as [string, number]),
+    ...(profile.tagDistribution ?? []).slice(0, 15).map((t) => [t.tag, t.percentage] as [string, number]),
+  ];
+
+  let best: Element = "arcane";
+  let bestExcess = MIN_EXCESS;
+  for (const theme of ELEMENT_THEMES) {
+    let share = 0;
+    for (const [name, percentage] of shares) if (theme.pattern.test(name)) share += percentage;
+    const excess = share - theme.baseline;
+    if (excess > bestExcess) {
+      bestExcess = excess;
+      best = theme.element;
+    }
+  }
+  return best;
+}
 
 export function selectCardIdentity(
   profile: AggregatedProfile,
   cardStats: CardStats,
   steamId64: string,
 ): CardIdentity {
-  // --- Select creature ---
-  const stats: [string, number][] = [
-    ["dedication", cardStats.dedication],
-    ["mastery", cardStats.mastery],
-    ["exploration", cardStats.exploration],
-    ["hoarding", cardStats.hoarding],
-    ["social", cardStats.social],
-    ["veteran", cardStats.veteran],
-  ];
-  stats.sort((a, b) => b[1] - a[1]);
+  const trait = mostDistinctiveTrait(cardStats);
+  const pool = TRAIT_CLASSES[trait];
+  const creatureClass = pool[hashCode(steamId64) % pool.length];
+  const element = selectElement(profile);
+  // Отдельный хеш, иначе палитра намертво срослась бы с классом существа:
+  // у всех «ракообразных» был бы один и тот же свет.
+  const palette = PALETTES[hashCode(`${steamId64}:palette`) % PALETTES.length];
 
-  const primaryStat = stats[0][0];
-  const secondaryStat = stats[1][0];
-  const primaryCreatures = STAT_CREATURES[primaryStat];
-  const secondaryCreatures = STAT_CREATURES[secondaryStat];
+  console.log(`[card-identity] черта=${trait} класс=${creatureClass} стихия=${element} свет=${palette}`);
 
-  // Hash-based creature selection for diversity across users
-  const primaryValue = stats[0][1];
-  const secondaryValue = stats[1][1];
-  const spread = primaryValue - secondaryValue;
-  const hash = hashCode(steamId64);
-
-  let creature: Creature;
-  if (spread > 20) {
-    // Dominant stat — iconic, but with hash variation
-    creature = primaryCreatures[hash % 2];
-  } else if (spread > 8) {
-    // Moderate dominance — hash across full primary pool
-    creature = primaryCreatures[hash % primaryCreatures.length];
-  } else {
-    // Stats are close — mix both pools
-    const combined = Array.from(new Set([...primaryCreatures, ...secondaryCreatures]));
-    creature = combined[hash % combined.length];
-  }
-
-  // --- Select element ---
-  // Build a string of all top genres + tags for matching
-  const genreStr = profile.genreDistribution
-    .slice(0, 5)
-    .map((g) => g.genre)
-    .join(" ");
-  const tagStr = profile.tagDistribution
-    .slice(0, 10)
-    .map((t) => t.tag)
-    .join(" ");
-  const combined = `${genreStr} ${tagStr}`;
-
-  // Score each element
-  const elementScores = new Map<Element, number>();
-  GENRE_ELEMENTS.forEach(([pattern, el]) => {
-    const matches = combined.match(new RegExp(pattern, "gi"));
-    if (matches) {
-      elementScores.set(el, (elementScores.get(el) || 0) + matches.length);
-    }
-  });
-
-  let element: Element = "arcane"; // default
-  let maxScore = 0;
-  elementScores.forEach((score, el) => {
-    if (score > maxScore) {
-      maxScore = score;
-      element = el;
-    }
-  });
-
-  console.log(`[card-identity] Stats: ${stats.map(([k, v]) => `${k}=${v}`).join(", ")}`);
-  console.log(`[card-identity] Creature: ${creature} (${primaryStat}→${secondaryStat}, spread=${spread})`);
-  console.log(`[card-identity] Element: ${element} (genres: ${genreStr})`);
-
-  return { creature, element };
+  return { creatureClass, element, palette };
 }
